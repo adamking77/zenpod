@@ -38,3 +38,27 @@ export async function loadChapters(id: number) {
 }
 
 export const chapterAt = (t: number) => chapters.list.findLast((c) => c.start <= t + 0.5) ?? null;
+
+/** Space plays and pauses, arrows skip; the same on every surface. */
+export function keys(e: KeyboardEvent) {
+  if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+  if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); player.toggle(); }
+  if (e.key === 'ArrowLeft') player.skip(-15);
+  if (e.key === 'ArrowRight') player.skip(30);
+}
+
+/** Leave this surface for another, with the closing surface folding away first. */
+export function goTo(to: 'win' | 'mini' | 'pill') {
+  const root = document.body;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  root.classList.add('leaving');
+  setTimeout(() => { invoke('set_mode', { to }); root.classList.remove('leaving'); }, reduce ? 0 : 200);
+}
+
+/** Replay the arrival when this window becomes the one showing. */
+export function arrivals(me: string) {
+  return listen<string>('mode', (e) => {
+    if (e.payload !== me) return;
+    document.body.classList.remove('arriving'); void document.body.offsetWidth; document.body.classList.add('arriving');
+  });
+}

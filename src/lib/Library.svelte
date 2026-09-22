@@ -4,7 +4,8 @@
   import { api, length, plain, short, type Episode, type Show } from '$lib/api';
   import Settings from '$lib/Settings.svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { chapters, now, player } from '$lib/now.svelte';
+  import { chapters, goTo, now, player } from '$lib/now.svelte';
+  import { I } from '$lib/icons';
   import { fmt } from '$lib/api';
   import { ui } from '$lib/ui.svelte';
 
@@ -105,6 +106,8 @@
       <button aria-pressed={!ui.notes && tab === 'following'} onclick={() => { tab = 'following'; open = null; ui.notes = false; }}>Following</button>
     </span>
     <span class="modes">
+      <button aria-label="Mini player" onclick={() => goTo('mini')}>{@html I.mini}</button>
+      <button aria-label="Pill" onclick={() => goTo('pill')}>{@html I.pill}</button>
       <button aria-label="Settings" aria-pressed={!ui.notes && tab === 'settings'} onclick={() => { tab = 'settings'; ui.notes = false; }}>
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
       </button>
@@ -172,6 +175,7 @@
   .tabs { display: flex; gap: 20px; align-items: baseline; }
   .tabs button { font-size: 14.5px; color: var(--text-faint); transition: color 0.14s ease; }
   .tabs button[aria-pressed="true"] { color: var(--text); }
+  .modes { display: flex; gap: 2px; }
   .modes button { width: 28px; height: 24px; display: grid; place-items: center; color: var(--text-faint); border-radius: 6px; transition: color 0.14s ease; }
   .modes button:hover { color: var(--text); }
   .modes button[aria-pressed="true"] { color: var(--text-dim); }

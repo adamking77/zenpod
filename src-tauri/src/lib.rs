@@ -1,6 +1,5 @@
 mod feed;
-#[cfg(target_os = "macos")]
-mod panel_test;
+mod modes;
 mod peaks;
 mod play;
 mod proto;
@@ -255,7 +254,12 @@ fn set_setting(app: AppHandle, core: State<Core>, key: String, value: String) ->
 pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    let builder = builder.plugin(tauri_nspanel::init());
+    let builder = builder.plugin(tauri_nspanel::init()).plugin(
+        tauri_plugin_window_state::Builder::new()
+            .with_denylist(&["player", "panel"])
+            .with_state_flags(tauri_plugin_window_state::StateFlags::POSITION | tauri_plugin_window_state::StateFlags::SIZE)
+            .build(),
+    );
     builder
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
@@ -285,6 +289,8 @@ pub fn run() {
             play::restore(app.handle());
             play::tidy(app.handle());
             play::spawn_player(app.handle())?;
+            #[cfg(target_os = "macos")]
+            modes::spawn(app.handle())?;
 
             // Refresh quietly on launch, then hourly.
             let h = app.handle().clone();
@@ -295,10 +301,6 @@ pub fn run() {
                 }
             });
 
-            #[cfg(target_os = "macos")]
-            if let Ok(v) = std::env::var("LISTENER_PANEL_TEST") {
-                panel_test::spawn(app.handle(), &v)?;
-            }
             Ok(())
         })
         .register_asynchronous_uri_scheme_protocol("listener", |ctx, req, responder| {
@@ -317,16 +319,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
             play::playback, play::player_ready, play::choose, play::toggle, play::seek, play::skip,
-            play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::keep
+            play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::keep,
+            modes::set_mode, modes::pill_panel
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, e| {
             if let RunEvent::Reopen { .. } = e {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+                let _ = modes::set_mode(app.clone(), "win".into());
             }
         });
 }

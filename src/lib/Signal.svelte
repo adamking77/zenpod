@@ -2,10 +2,11 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { INSET, drawChapters, drawField, drawMargins, drawOrbit, drawThread, feed, makeViz, resolveColors, updateSignal } from '$lib/signal.js';
+  import { INSET, drawChapters, drawField, drawMargins, drawOrbit, drawTether, drawThread, feed, makeViz, resolveColors, updateSignal } from '$lib/signal.js';
   import { chapters, now, player, position } from '$lib/now.svelte';
 
-  let { mode }: { mode: 'field' | 'thread' | 'orbit' } = $props();
+  // `variant` picks the surface: the main stage, the Mini's Orbit, the Pill's small Orbit, or the panel's tether.
+  let { mode = 'orbit', variant = 'main' }: { mode?: 'field' | 'thread' | 'orbit'; variant?: 'main' | 'mini' | 'pill' | 'tether' } = $props();
 
   // Until the episode has been measured, the shape is quiet and flat: never an invented one.
   const FLAT = new Array(360).fill(0.04);
@@ -50,7 +51,10 @@
         const c = canvas.getContext('2d')!;
         c.setTransform(r, 0, 0, r, 0, 0); c.clearRect(0, 0, w, h); c.globalAlpha = 1;
         const marks = chapters.list.map((k) => k.start);
-        if (mode === 'orbit') {
+        if (variant === 'mini') drawOrbit(V, c, w, h, prog, peaks, active, el, { inner: 0.165, maxRay: 0.32, rays: 84 });
+        else if (variant === 'pill') drawOrbit(V, c, w, h, prog, peaks, active, el, { small: true, inner: 0.2, maxRay: 0.28, rays: 30 });
+        else if (variant === 'tether') drawTether(V, c, w, h, h / 2, prog, active);
+        else if (mode === 'orbit') {
           drawOrbit(V, c, w, h, prog, peaks, active, el);
           drawChapters(c, w, h, mode, marks, now.duration, prog);
         } else {
@@ -72,7 +76,9 @@
     if (!now.duration) return;
     const r = canvas.getBoundingClientRect();
     let f = (e.clientX - r.left - r.width * INSET) / (r.width * (1 - 2 * INSET));
-    if (mode === 'orbit') {
+    if (variant === 'tether') f = (e.clientX - r.left) / r.width;
+    if (variant === 'pill') return;
+    if (mode === 'orbit' || variant === 'mini') {
       let a = Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) + Math.PI / 2;
       if (a < 0) a += Math.PI * 2;
       f = a / (Math.PI * 2);
@@ -81,7 +87,7 @@
   }
 </script>
 
-<canvas bind:this={canvas} class:orbit={mode === 'orbit'} onpointerdown={seekAt}
+<canvas bind:this={canvas} class:orbit={mode === 'orbit'} class:fill={variant !== 'main'} onpointerdown={seekAt}
   aria-label={mode === 'orbit' ? 'Orbit. Click to move through the episode.' : 'Waveform. Click to move through the episode.'}></canvas>
 
 <style>
@@ -89,4 +95,5 @@
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%); }
   canvas.orbit { height: 340px; -webkit-mask-image: none; mask-image: none; }
+  canvas.fill { width: 100%; height: 100%; -webkit-mask-image: none; mask-image: none; }
 </style>

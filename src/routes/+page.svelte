@@ -3,21 +3,14 @@
   import Library from '$lib/Library.svelte';
   import Listen from '$lib/Listen.svelte';
   import { loadPrefs } from '$lib/prefs.svelte';
-  import { follow, now, player } from '$lib/now.svelte';
+  import { arrivals, follow, keys, now, player } from '$lib/now.svelte';
 
   onMount(() => {
     loadPrefs();
-    const un = follow();
-    return () => { un.then((f) => f()); };
+    const un = follow(), arr = arrivals('win');
+    return () => { un.then((f) => f()); arr.then((f) => f()); };
   });
 
-  function keys(e: KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
-    // Space on a focused button presses that button; anywhere else it plays and pauses.
-    if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); player.toggle(); }
-    if (e.key === 'ArrowLeft') player.skip(-15);
-    if (e.key === 'ArrowRight') player.skip(30);
-  }
 </script>
 
 <svelte:window onkeydown={keys} />
