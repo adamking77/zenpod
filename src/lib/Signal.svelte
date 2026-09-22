@@ -72,7 +72,7 @@
     return () => { cancelAnimationFrame(raf); bc.close(); mo.disconnect(); dark.removeEventListener('change', recolor); un.then((f) => f()); };
   });
 
-  function seekAt(e: PointerEvent) {
+  function seekAt(e: MouseEvent) {
     if (!now.duration) return;
     const r = canvas.getBoundingClientRect();
     let f = (e.clientX - r.left - r.width * INSET) / (r.width * (1 - 2 * INSET));
@@ -87,7 +87,7 @@
   }
 </script>
 
-<canvas bind:this={canvas} class:orbit={mode === 'orbit'} class:fill={variant !== 'main'} onpointerdown={seekAt}
+<canvas bind:this={canvas} class:orbit={mode === 'orbit'} class:fill={variant !== 'main'} onclick={seekAt}
   aria-label={mode === 'orbit' ? 'Orbit. Click to move through the episode.' : 'Waveform. Click to move through the episode.'}></canvas>
 
 <style>

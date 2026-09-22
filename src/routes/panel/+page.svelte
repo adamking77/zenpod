@@ -12,7 +12,8 @@
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && close()} />
 
-<Surface me="panel" radius={18}>
+<!-- The panel stays anchored to its Pill; move the Pill and it follows. -->
+<Surface me="panel" radius={18} drag={false}>
   <div class="panel">
     {#if now.episode}
       <div class="top">

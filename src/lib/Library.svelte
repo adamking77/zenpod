@@ -135,7 +135,7 @@
 {/snippet}
 
 <section class="lib" aria-label="Library">
-  <div class="lib-h" data-tauri-drag-region>
+  <div class="lib-h">
     <span class="tabs" role="group" aria-label="Library">
       <button aria-pressed={!ui.notes && ui.tab === 'new'} onclick={() => { ui.tab = 'new'; open = null; ui.notes = false; }}>New</button>
       <button aria-pressed={!ui.notes && ui.tab === 'following'} onclick={() => { ui.tab = 'following'; open = null; ui.notes = false; }}>Following</button>
@@ -175,7 +175,7 @@
         {/each}
       {:else}
         {#each notes as n}
-          <p class="note">{#each n as b}{#if b.href}<a href={b.href} onclick={(e) => { e.preventDefault(); openUrl(b.href!); }}>{b.text}</a>{:else}{b.text}{/if}{/each}</p>
+          <p class="note" data-no-drag>{#each n as b}{#if b.href}<a href={b.href} onclick={(e) => { e.preventDefault(); openUrl(b.href!); }}>{b.text}</a>{:else}{b.text}{/if}{/each}</p>
         {:else}<p class="quiet">This episode came without notes.</p>{/each}
       {/if}
     {:else if ui.tab === 'settings'}

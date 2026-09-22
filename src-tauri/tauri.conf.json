@@ -16,12 +16,15 @@
         "title": "Listener",
         "width": 1080,
         "height": 700,
-        "minWidth": 1040,
+        "minWidth": 920,
         "minHeight": 660,
         "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 17, "y": 26 }
+        "trafficLightPosition": {
+          "x": 17,
+          "y": 26
+        }
       }
     ],
     "macOSPrivateApi": true,
@@ -31,13 +34,22 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "Music",
+    "shortDescription": "A quiet podcast player.",
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "13.0"
+    }
   }
 }

@@ -81,7 +81,7 @@
 </section>
 
 <style>
-  .listen { position: relative; padding: 64px 48px 44px; display: grid; grid-template-rows: auto 1fr auto; min-height: 0; min-width: 0; }
+  .listen { container-type: inline-size; position: relative; padding: 64px 48px 44px; display: grid; grid-template-rows: auto 1fr auto; min-height: 0; min-width: 0; }
   .now { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 24px; align-items: center; min-width: 0; }
   .cover { display: block; aspect-ratio: 1; width: 100%; border-radius: 9px; overflow: hidden; background: var(--hair); }
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -94,7 +94,13 @@
   .vz button { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); transition: color 0.14s ease; }
   .vz button:hover { color: var(--text-dim); }
   .vz button[aria-pressed="true"] { color: var(--text); }
-  .tp { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; margin-top: 6px; }
+  .tp { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: "a ctl b"; align-items: center; gap: 20px; margin-top: 6px; }
+  .tp > .side:first-child { grid-area: a; } .tp > .ctl { grid-area: ctl; } .tp > .end { grid-area: b; }
+  /* Narrow: transport on its own line, the quieter readouts beneath it. */
+  @container (max-width: 575px) {
+    .tp { grid-template-columns: 1fr 1fr; grid-template-areas: "ctl ctl" "a b"; row-gap: 14px; }
+    .tp > .ctl { justify-self: center; }
+  }
   .side { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
   .side.end { justify-content: flex-end; }
   .ctl { display: flex; align-items: center; gap: 30px; }

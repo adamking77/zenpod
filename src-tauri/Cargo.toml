@@ -51,3 +51,8 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package."symphonia-core"]
 opt-level = 3
+
+# Stripped proc-macro dylibs come out malformed on macOS 27 ("mis-aligned LINKEDIT string pool")
+# and fail to load; strip the app, not the compile-time macro crates.
+[profile.release.build-override]
+strip = false

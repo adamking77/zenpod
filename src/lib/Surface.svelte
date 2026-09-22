@@ -4,8 +4,9 @@
   import { loadPrefs } from '$lib/prefs.svelte';
   import { arrivals, follow, keys, now } from '$lib/now.svelte';
   import { castFrom } from '$lib/cast';
+  import { dragWindow } from '$lib/drag';
 
-  let { me, radius, children }: { me: string; radius: number; children: Snippet } = $props();
+  let { me, radius, drag = true, children }: { me: string; radius: number; drag?: boolean; children: Snippet } = $props();
 
   onMount(() => {
     loadPrefs();
@@ -16,7 +17,7 @@
 </script>
 
 <svelte:window onkeydown={keys} />
-<div class="surface" style:border-radius="{radius}px" data-tauri-drag-region>{@render children()}</div>
+<div class="surface" style:border-radius="{radius}px" use:dragWindow={drag}>{@render children()}</div>
 
 <style>
   :global(html), :global(body) { background: transparent !important; }

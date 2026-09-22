@@ -23,7 +23,7 @@
       <Signal variant="pill" />
       {#if now.episode}<span class="disc"><img src="listener://localhost/art/{now.episode.show_id}" alt="" /></span>{/if}
     </span>
-    <button class="who" aria-label="Open the pill panel" aria-expanded={open} onclick={() => invoke('pill_panel', { open: !open })}>
+    <button class="who" data-drag aria-label="Open the pill panel" aria-expanded={open} onclick={() => invoke('pill_panel', { open: !open })}>
       <span class="t">{now.episode?.title ?? 'The room is quiet.'}</span>
       <span class="num">{now.episode ? `${fmt(t)} · ${left}` : ''}</span>
     </button>

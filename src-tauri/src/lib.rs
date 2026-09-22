@@ -308,13 +308,18 @@ pub fn run() {
             tauri::async_runtime::spawn(async move { responder.respond(proto::handle(app, req).await) });
         })
         // Closing the window only hides it; the player window keeps playing.
-        .on_window_event(|w, e| {
-            if let WindowEvent::CloseRequested { api, .. } = e {
-                if w.label() == "main" {
-                    api.prevent_close();
-                    let _ = w.hide();
+        .on_window_event(|w, e| match e {
+            WindowEvent::CloseRequested { api, .. } if w.label() == "main" => {
+                api.prevent_close();
+                let _ = w.hide();
+            }
+            // The Pill's panel travels with the Pill.
+            WindowEvent::Moved(_) if w.label() == "pill" => {
+                if w.app_handle().get_webview_window("panel").and_then(|p| p.is_visible().ok()).unwrap_or(false) {
+                    let _ = modes::pill_panel(w.app_handle().clone(), true);
                 }
             }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
