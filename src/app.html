@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Listener</title>
+    <script>
+      // Set the flavor before first paint so the window never flashes the wrong ground.
+      let look = ''; try { look = localStorage.getItem('listener.look') || ''; } catch {}
+      const night = look ? look === 'night' : matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.flavor = night ? 'mocha' : 'flat';
+    </script>
+    %sveltekit.head%
+  </head>
+  <body>
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

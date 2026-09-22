@@ -1,0 +1,26 @@
+/* Pass 7 on top of the 2050 tokens: its type, ink steps, hairlines and the cast light. */
+:root {
+  --font-ui: "Hanken Grotesk Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --ink-dim: 72%;
+  --ink-faint: 44%;
+  --cast: #6f8fc9;
+  --cast-pct: 34%;
+  --glow: 1000px;
+}
+:root[data-flavor="mocha"] { --hair: rgba(255, 255, 255, 0.06); }
+:root[data-flavor="flat"] { --hair: rgba(0, 0, 0, 0.07); --cast-pct: 30%; --glow: 880px; }
+
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  background: var(--base);
+  color: var(--text);
+  font: 400 14px/1.5 var(--font-ui);
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

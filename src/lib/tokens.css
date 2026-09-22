@@ -1,0 +1,205 @@
+/* 2050 design system · tokens · 0.2.0
+   Three layers. Flavor: the Calmppuccin planes and fourteen named accents, chosen by
+   data-flavor on <html>. Role: what the interface reads (ground, surface, text, accent,
+   question, ok, failed, agents), derived from the flavor. Scale: type, space, shape,
+   motion, shared by every flavor. Rebrand by adding a flavor; never by editing a role. */
+
+/* ---------- Flavors ---------- */
+/* Planes darkest to lightest: crust (rail, scrims), mantle (panels), base (the work plane).
+   Dark flavors: surface sits above base. Light flavors: surface is the lightest plane. */
+
+:root,
+:root[data-flavor="mocha"] {
+  --crust: #11111a; --mantle: #171724; --base: #1b1b29; --surface: #20202f; --raised: #2f3147;
+  --text: #dfe4f0; --text-muted: #8a90a6; --line: #2a2a3d; --line-strong: #3a3a52;
+  --hair: rgba(255, 255, 255, 0.045);
+  --rosewater: #e2cfcb; --flamingo: #e9c5c5; --pink: #e4b5d7; --mauve: #ba9ae2; --red: #e4829e;
+  --maroon: #d8939f; --peach: #e2a37b; --yellow: #e7d1a2; --green: #99cf94; --teal: #8cd3c7;
+  --sky: #80ccda; --sapphire: #70b7d8; --blue: #7fa6e6; --lavender: #a6afe9;
+  color-scheme: dark;
+}
+
+:root[data-flavor="nitro"] {
+  --crust: #0d0d14; --mantle: #13131f; --base: #181825; --surface: #1d1d2b; --raised: #262637;
+  --text: #c9cfe0; --text-muted: #8b91a8; --line: #232334; --line-strong: #32324a;
+  --hair: rgba(255, 255, 255, 0.045);
+  --rosewater: #dcc9c5; --flamingo: #e3bfbf; --pink: #deafd1; --mauve: #b494dc; --red: #de7c98;
+  --maroon: #d28d99; --peach: #dc9d75; --yellow: #e1cb9c; --green: #93c98e; --teal: #86cdc1;
+  --sky: #7ac6d4; --sapphire: #6ab1d2; --blue: #79a0e0; --lavender: #a0a9e3;
+  color-scheme: dark;
+}
+
+:root[data-flavor="macchiato"] {
+  --crust: #171825; --mantle: #1e2030; --base: #24273a; --surface: #292c40; --raised: #343852;
+  --text: #cad2ee; --text-muted: #9099b8; --line: #2f3247; --line-strong: #3f4360;
+  --hair: rgba(255, 255, 255, 0.045);
+  --rosewater: #e4d0cc; --flamingo: #eac6c6; --pink: #e5b7d8; --mauve: #bc9de3; --red: #e5849f;
+  --maroon: #d994a0; --peach: #e3a47c; --yellow: #e8d2a3; --green: #9ad095; --teal: #8dd4c8;
+  --sky: #81cddb; --sapphire: #71b8d9; --blue: #80a7e7; --lavender: #a7b0ea;
+  color-scheme: dark;
+}
+
+:root[data-flavor="frappe"] {
+  --crust: #222532; --mantle: #282b3a; --base: #2f3344; --surface: #353a4c; --raised: #414660;
+  --text: #ccd5f4; --text-muted: #969fc0; --line: #3a3e52; --line-strong: #4a4f68;
+  --hair: rgba(255, 255, 255, 0.045);
+  --rosewater: #e6d2ce; --flamingo: #ecc8c8; --pink: #e7b9da; --mauve: #be9fe5; --red: #e786a1;
+  --maroon: #db96a2; --peach: #e5a67e; --yellow: #ead4a5; --green: #9cd297; --teal: #8fd6ca;
+  --sky: #83cfdd; --sapphire: #73badb; --blue: #82a9e9; --lavender: #a9b2ec;
+  color-scheme: dark;
+}
+
+:root[data-flavor="oled"] {
+  --crust: #000000; --mantle: #07070c; --base: #0b0b11; --surface: #111118; --raised: #1b1b24;
+  --text: #bfc5d8; --text-muted: #7f859a; --line: #17171f; --line-strong: #383844;
+  --hair: rgba(255, 255, 255, 0.045);
+  --rosewater: #c9b7b3; --flamingo: #d0adad; --pink: #cb9ebe; --mauve: #a385c9; --red: #cb7189;
+  --maroon: #c07f8a; --peach: #c98e6a; --yellow: #cdb98d; --green: #85b681; --teal: #79bab0;
+  --sky: #6eb4c1; --sapphire: #5fa0bf; --blue: #6d90cc; --lavender: #9098cf;
+  color-scheme: dark;
+}
+
+:root[data-flavor="latte"] {
+  --crust: #cfd1d4; --mantle: #dcdee1; --base: #e9eaee; --surface: #f4f5f8; --raised: #d6d8de;
+  --text: #3c3f57; --text-muted: #5f637c; --line: #c4c6cf; --line-strong: #9a9da8;
+  --hair: rgba(0, 0, 0, 0.07);
+  --rosewater: #a8817a; --flamingo: #b07070; --pink: #b05a95; --mauve: #7a4fa8; --red: #b03a56;
+  --maroon: #9c4b57; --peach: #b06a33; --yellow: #9c7f2c; --green: #4a7c4e; --teal: #3d8478;
+  --sky: #3178a0; --sapphire: #2a6a9c; --blue: #3a5fa8; --lavender: #5a63b0;
+  color-scheme: light;
+}
+
+/* Flat White: the light flavor designed for this system. Warm off-whites, softened ink. */
+:root[data-flavor="flat"] {
+  --crust: #eceae7; --mantle: #f4f2ef; --base: #fbfaf8; --surface: #ffffff; --raised: #e6e3de;
+  --text: #3f3f48; --text-muted: #62626b; --line: #d8d5d0; --line-strong: #aaa69f;
+  --hair: rgba(0, 0, 0, 0.06);
+  --rosewater: #a07b74; --flamingo: #a86a6a; --pink: #a85590; --mauve: #734aa0; --red: #a8354f;
+  --maroon: #944650; --peach: #a8652e; --yellow: #947a28; --green: #457747; --teal: #387f73;
+  --sky: #2c739b; --sapphire: #256597; --blue: #355aa0; --lavender: #555ea8;
+  color-scheme: light;
+}
+
+/* ---------- Roles ---------- */
+:root {
+  /* planes */
+  --ground: var(--base);                 /* the work plane at rest */
+  --ground-deep: var(--crust);           /* ambient idle, rail, scrims */
+  --panel: var(--mantle);                /* aside, inspector */
+  --surface-line: var(--line);           /* hairlines and surface borders */
+  --row-line: var(--hair);               /* hairlines between rows */
+  --tint-selected: color-mix(in srgb, var(--accent) var(--sel-strength, 10%), transparent);  /* the selected row or card */
+  --tint-hover: var(--hair);             /* hover on a row or card */
+  --scrim: color-mix(in srgb, var(--crust) 60%, transparent);
+
+  /* text ramp: two set by the flavor, three derived, so every flavor keeps the same steps.
+     The mix percentages are the contrast step (see data-contrast below). */
+  --ink-mid: 80%; --ink-dim: 66%; --ink-faint: 42%; --sel-strength: 10%;
+  --text-mid: color-mix(in srgb, var(--text) var(--ink-mid), var(--ground));
+  --text-dim: color-mix(in srgb, var(--text-muted) var(--ink-dim), var(--ground));
+  --text-faint: color-mix(in srgb, var(--text-muted) var(--ink-faint), var(--ground));
+
+  /* the singular marks */
+  --accent: var(--blue);                 /* selection, connections, recommended. Overridable per person. */
+  --question: var(--peach);              /* a question for you; nothing else */
+  --ok: var(--green);                    /* verified, complete */
+  --failed: var(--red);                  /* failed, unavailable */
+
+  /* agent identity hues: never the four roles above, never the accent */
+  --agent-1: var(--teal);
+  --agent-2: var(--lavender);
+  --agent-3: var(--flamingo);
+  --agent-4: var(--yellow);
+  --agent-5: var(--rosewater);
+  --agent-6: var(--sky);
+
+  /* charts: one hue graded, from the reading ink, never from the accent */
+  --chart-ink: var(--text-mid);
+  --chart-ink-2: color-mix(in srgb, var(--text-mid) 55%, var(--ground));
+  --chart-ink-3: color-mix(in srgb, var(--text-mid) 30%, var(--ground));
+  --chart-grid: var(--row-line);
+  --chart-hover: var(--accent);
+
+  /* type */
+  --font-ui: "Geist", "Inter", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --t-sentence: 300 34px/1.3 var(--font-ui);
+  --t-page: 300 28px/1.3 var(--font-ui);
+  --t-card: 300 19px/1.25 var(--font-ui);
+  --t-body: 400 15px/1.6 var(--font-ui);
+  --t-reading: 400 17px/1.65 var(--font-ui);
+  --t-control: 400 14px/1.4 var(--font-ui);
+  --t-mono: 400 11px/1.4 var(--font-mono);
+  --t-eyebrow: 400 12px/1.4 var(--font-mono);
+  --t-stat: 300 30px/1 var(--font-ui);
+  --t-stat-word: 400 12px/1.3 var(--font-ui);
+  --track-eyebrow: 0.08em;
+  --track-section: 0.12em;
+  --track-sentence: -0.005em;
+  --track-body: 0.01em;
+
+  /* space */
+  --margin-left: 120px;
+  --measure-reading: 720px;
+  --measure-sentence: 820px;
+  --measure-inventory: 1200px;
+  --gap-row: 18px;
+  --gap-band: 26px;
+
+  /* shape */
+  --r-surface: 10px;
+  --r-modal: 12px;
+  --r-pill: 999px;
+  --r-tag: 999px;
+  --r-mark: 2px;
+
+  /* the dock */
+  --dock-height: 36px;
+  --dock-bottom: 18px;
+
+  /* motion: continuity, never spinners. Curves from Emil Kowalski's standards. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);        /* entering, exiting, release */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);    /* moving on screen */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);      /* drawers and sheets */
+  --ease-hover: ease;                                /* colour on hover */
+  --ease: var(--ease-out);                           /* default */
+  --dur-fast: 90ms;        /* press feedback */
+  --dur-base: 140ms;       /* tooltip, hover, small popover */
+  --dur-pane: 200ms;       /* dropdown, popover, quiet note */
+  --dur-sheet: 240ms;      /* modal, drawer, aside */
+  --dur-return: 200ms;     /* idle to awake */
+  --dur-cap: 300ms;        /* nothing in the interface is slower */
+  --press-scale: 0.98;
+}
+
+/* ---------- Planes: one or two ---------- */
+/* Default: everything on one plane; the rail, aside, inspector and agent panel share --ground and
+   are separated by hairlines. data-panes="segmented" gives the person a second plane: the rail
+   drops to --crust and one region (aside or agent panel, the one they leave and return to) takes
+   --mantle. Never three working planes at once. Never a plane to say "important". */
+:root { --rail: var(--ground); --region: var(--ground); --region-line: var(--surface-line); }
+:root[data-panes="segmented"] { --rail: var(--crust); --region: var(--mantle); --region-line: transparent; }
+
+/* ---------- Contrast: three steps, chosen once ---------- */
+/* Calm is the palette as designed. Clear brings body ink to full and strengthens hairlines.
+   Strong pushes ink to near-black or near-white, doubles lines and tints. Steps, not a slider. */
+:root[data-contrast="clear"] {
+  --ink-mid: 100%; --ink-dim: 85%; --ink-faint: 60%; --sel-strength: 14%;
+  --surface-line: var(--line-strong); --row-line: var(--line);
+}
+:root[data-contrast="strong"] {
+  --ink-mid: 100%; --ink-dim: 100%; --ink-faint: 80%; --sel-strength: 18%;
+  --text: #eef1f8; --text-muted: #c3c9da;
+  --surface-line: var(--line-strong); --row-line: var(--line);
+  --chart-ink: var(--text);
+}
+:root[data-contrast="strong"][data-flavor="flat"],
+:root[data-contrast="strong"][data-flavor="latte"] { --text: #1a1a22; --text-muted: #3b3b46; }
+
+/* Reduced motion, and the Not today session mode: keep the states, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-pane: 0ms; --dur-sheet: 0ms; --dur-return: 120ms; --press-scale: 1; }
+}
+:root[data-session="not-today"] {
+  --dur-fast: 0ms; --dur-base: 0ms; --dur-pane: 0ms; --dur-sheet: 0ms; --dur-return: 120ms; --press-scale: 1;
+}
