@@ -232,16 +232,31 @@ fn measure(app: AppHandle, id: i64, path: std::path::PathBuf) {
     });
 }
 
-#[derive(Serialize, serde::Deserialize, Clone)]
+#[derive(Serialize, Clone)]
 pub struct Chapter {
     title: String,
-    #[serde(rename = "startTime")]
     start: f64,
 }
 
 /// Podcast Namespace chapters, fetched once and kept beside the audio so they work offline.
 #[tauri::command]
 pub async fn chapters(app: AppHandle, id: i64) -> Vec<Chapter> {
+    let Ok(dir) = app.path().app_data_dir().map(|d| d.join("chapters")) else { return vec![] };
+    let file = dir.join(format!("{id}.json"));
+    let text = match std::fs::read_to_string(&file) {
+        Ok(t) => t,
+        Err(_) => {
+            let Some(url) = store::chapters_url(&app.state::<Core>().db.lock().unwrap(), id).ok().flatten() else { return vec![] };
+            let Ok(t) = async { HTTP.get(&url).send().await?.error_for_status()?.text().await }.await else { return vec![] };
+            let _ = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, &t));
+            t
+        }
+    };
+    parse_chapters(&text)
+}
+
+/// Chapters meant for the table of contents (`toc: false` ones are skipped), in file order.
+fn parse_chapters(text: &str) -> Vec<Chapter> {
     #[derive(serde::Deserialize)]
     struct File {
         chapters: Vec<Raw>,
@@ -258,20 +273,22 @@ pub async fn chapters(app: AppHandle, id: i64) -> Vec<Chapter> {
     fn yes() -> bool {
         true
     }
-    let Ok(dir) = app.path().app_data_dir().map(|d| d.join("chapters")) else { return vec![] };
-    let file = dir.join(format!("{id}.json"));
-    let text = match std::fs::read_to_string(&file) {
-        Ok(t) => t,
-        Err(_) => {
-            let Some(url) = store::chapters_url(&app.state::<Core>().db.lock().unwrap(), id).ok().flatten() else { return vec![] };
-            let Ok(t) = async { HTTP.get(&url).send().await?.error_for_status()?.text().await }.await else { return vec![] };
-            let _ = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, &t));
-            t
-        }
-    };
-    serde_json::from_str::<File>(&text)
+    serde_json::from_str::<File>(text)
         .map(|f| f.chapters.into_iter().filter(|c| c.toc).map(|c| Chapter { title: c.title, start: c.start }).collect())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn chapters() {
+        let f = r#"{"version":"1.2.0","chapters":[{"title":"EP 489","startTime":0,"endTime":4},
+          {"title":"Time Flies","startTime":298.5},{"title":"hidden","startTime":300,"toc":false}]}"#;
+        let c = super::parse_chapters(f);
+        assert_eq!(c.len(), 2);
+        assert_eq!((c[1].title.as_str(), c[1].start), ("Time Flies", 298.5));
+        assert!(super::parse_chapters("not json").is_empty());
+    }
 }
 
 /// Keep an episode offline, or let it go.

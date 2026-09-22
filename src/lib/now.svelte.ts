@@ -33,7 +33,7 @@ export const chapters = $state<{ list: Chapter[]; for: number | null }>({ list: 
 export async function loadChapters(id: number) {
   chapters.for = id;
   chapters.list = [];
-  const list = await invoke<Chapter[]>('chapters', { id });
+  const list = await invoke<Chapter[]>('chapters', { id }).catch(() => [] as Chapter[]);
   if (chapters.for === id) chapters.list = list;
 }
 
