@@ -3,6 +3,23 @@
   import { listen } from '@tauri-apps/api/event';
   import { api, length, plain, short, type Episode, type Show } from '$lib/api';
   import Settings from '$lib/Settings.svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { now } from '$lib/now.svelte';
+  import { ui } from '$lib/ui.svelte';
+
+  // Show notes as plain paragraphs: the feed's HTML is read for its text only.
+  let notes = $state<string[]>([]);
+  $effect(() => {
+    const id = now.episode?.id;
+    if (!ui.notes || !id) return;
+    invoke<string | null>('episode_notes', { id }).then((html) => {
+      const doc = new DOMParser().parseFromString(html ?? '', 'text/html');
+      doc.querySelectorAll('br').forEach((b) => b.replaceWith('\n'));
+      const blocks = [...doc.body.querySelectorAll('p, li')].map((p) => p.textContent ?? '');
+      notes = (blocks.length ? blocks : (doc.body.textContent ?? '').split(/\n\s*\n|\n/))
+        .map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    });
+  });
 
   let { current = null, onplay }: { current?: number | null; onplay: (e: Episode) => void } = $props();
 
@@ -65,17 +82,22 @@
 <section class="lib" aria-label="Library">
   <div class="lib-h" data-tauri-drag-region>
     <span class="tabs" role="group" aria-label="Library">
-      <button aria-pressed={tab === 'new'} onclick={() => { tab = 'new'; open = null; }}>New</button>
-      <button aria-pressed={tab === 'following'} onclick={() => { tab = 'following'; open = null; }}>Following</button>
+      <button aria-pressed={!ui.notes && tab === 'new'} onclick={() => { tab = 'new'; open = null; ui.notes = false; }}>New</button>
+      <button aria-pressed={!ui.notes && tab === 'following'} onclick={() => { tab = 'following'; open = null; ui.notes = false; }}>Following</button>
     </span>
     <span class="modes">
-      <button aria-label="Settings" aria-pressed={tab === 'settings'} onclick={() => (tab = 'settings')}>
+      <button aria-label="Settings" aria-pressed={!ui.notes && tab === 'settings'} onclick={() => { tab = 'settings'; ui.notes = false; }}>
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
       </button>
     </span>
   </div>
   <div class="list" bind:this={list}>
-    {#if tab === 'settings'}
+    {#if ui.notes && now.episode}
+      <button class="back" onclick={() => (ui.notes = false)}>← back</button>
+      <h2 class="show-h">{now.episode.title}</h2>
+      <p class="show-p sub">{now.episode.show_title} · {date(now.episode.published)}</p>
+      {#each notes as n}<p class="note">{n}</p>{:else}<p class="quiet">This episode came without notes.</p>{/each}
+    {:else if tab === 'settings'}
       <Settings />
     {:else if tab === 'new'}
       {#each grouped as g (g.label)}
@@ -136,5 +158,6 @@
   .show-h { font-weight: 250; font-size: 24px; line-height: 1.2; margin: 0 0 8px; }
   .show-p { color: var(--text-dim); font-size: 13.5px; margin: 0 0 14px; max-width: 38ch; display: -webkit-box; -webkit-line-clamp: 5; line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
   .new { color: var(--accent); }
+  .note { font-size: 14px; line-height: 1.6; color: var(--text-mid); margin: 0 0 12px; max-width: 42ch; user-select: text; cursor: text; }
   .quiet { color: var(--text-dim); font-size: 13.5px; max-width: 32ch; margin-top: 8px; }
 </style>

@@ -201,6 +201,37 @@ pub fn report(app: AppHandle, core: State<Core>, id: i64, position: f64, duratio
     broadcast(&app, &now);
 }
 
+/// The episode's loudness shape, or nothing yet. Computing it is kicked off once the file is on disk.
+#[tauri::command]
+pub fn peaks(app: AppHandle, core: State<Core>, id: i64) -> Option<Vec<f32>> {
+    let db = core.db.lock().unwrap();
+    if let Some(b) = store::peaks(&db, id).ok().flatten() {
+        return Some(crate::peaks::from_blob(&b));
+    }
+    let local = store::audio_source(&db, id).ok()?.0?;
+    drop(db);
+    measure(app, id, local.into());
+    None
+}
+
+fn measure(app: AppHandle, id: i64, path: std::path::PathBuf) {
+    if !app.state::<Core>().fetching.lock().unwrap().insert(-id) {
+        return; // already measuring (negative ids mark measuring, positive downloading)
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let res = crate::peaks::compute(&path);
+        let core = app.state::<Core>();
+        core.fetching.lock().unwrap().remove(&-id);
+        match res {
+            Ok(p) => {
+                let _ = store::set_peaks(&core.db.lock().unwrap(), id, &crate::peaks::to_blob(&p));
+                let _ = app.emit("peaks", id);
+            }
+            Err(e) => eprintln!("[peaks] episode {id}: {e}"),
+        }
+    });
+}
+
 /// Keep a copy of what's playing on disk: it plays offline from then on, and M3 reads its loudness.
 pub fn cache(app: AppHandle, id: i64) {
     {
@@ -243,5 +274,6 @@ async fn download(app: &AppHandle, id: i64) -> Result<(), String> {
     std::fs::rename(&part, &done).map_err(err)?;
     let core = app.state::<Core>();
     store::set_local(&core.db.lock().unwrap(), id, Some(&done.to_string_lossy())).map_err(err)?;
+    measure(app.clone(), id, done);
     Ok(())
 }

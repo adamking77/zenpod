@@ -215,3 +215,16 @@ pub fn set_local(db: &Connection, id: i64, path: Option<&str>) -> rusqlite::Resu
     db.execute("update episodes set local_path = ?2 where id = ?1", params![id, path])?;
     Ok(())
 }
+
+pub fn peaks(db: &Connection, id: i64) -> rusqlite::Result<Option<Vec<u8>>> {
+    db.query_row("select peaks from episodes where id = ?1", [id], |r| r.get(0))
+}
+
+pub fn set_peaks(db: &Connection, id: i64, blob: &[u8]) -> rusqlite::Result<()> {
+    db.execute("update episodes set peaks = ?2 where id = ?1", params![id, blob])?;
+    Ok(())
+}
+
+pub fn description(db: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
+    db.query_row("select description from episodes where id = ?1", [id], |r| r.get(0))
+}

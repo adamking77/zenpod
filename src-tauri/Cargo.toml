@@ -38,3 +38,13 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# Decoding for loudness peaks is far too slow unoptimised; keep debug builds usable.
+[profile.dev.package."symphonia-bundle-mp3"]
+opt-level = 3
+[profile.dev.package."symphonia-codec-aac"]
+opt-level = 3
+[profile.dev.package."symphonia-format-isomp4"]
+opt-level = 3
+[profile.dev.package."symphonia-core"]
+opt-level = 3

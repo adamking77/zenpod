@@ -1,6 +1,7 @@
 mod feed;
 #[cfg(target_os = "macos")]
 mod panel_test;
+mod peaks;
 mod play;
 mod proto;
 mod store;
@@ -190,6 +191,11 @@ fn log(msg: String) {
 }
 
 #[tauri::command]
+fn episode_notes(core: State<Core>, id: i64) -> R<Option<String>> {
+    store::description(&core.db.lock().unwrap(), id).map_err(err)
+}
+
+#[tauri::command]
 fn shows(core: State<Core>) -> R<Vec<store::ShowRow>> {
     store::shows(&core.db.lock().unwrap()).map_err(err)
 }
@@ -284,7 +290,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
             play::playback, play::player_ready, play::choose, play::toggle, play::seek, play::skip,
-            play::set_speed, play::report
+            play::set_speed, play::report, play::peaks, episode_notes
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

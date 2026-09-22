@@ -2,6 +2,36 @@
   import { onMount } from 'svelte';
   import { fmt } from '$lib/api';
   import { now, player, position } from '$lib/now.svelte';
+  import { prefs, setPref } from '$lib/prefs.svelte';
+  import { ui } from '$lib/ui.svelte';
+  import Signal from '$lib/Signal.svelte';
+
+  const MODES = ['field', 'thread', 'orbit'] as const;
+  type Mode = (typeof MODES)[number];
+  const mode = $derived<Mode>(MODES.includes(prefs.viz as Mode) ? (prefs.viz as Mode) : 'field');
+
+  // The light takes the artwork's colour: its most saturated pixels, averaged, at a steady lightness.
+  $effect(() => {
+    const show = now.episode?.show_id;
+    if (!show) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 24;
+      const g = c.getContext('2d', { willReadFrequently: true })!;
+      g.drawImage(img, 0, 0, 24, 24);
+      const d = g.getImageData(0, 0, 24, 24).data;
+      let r = 0, gr = 0, b = 0, wt = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+        const w = (mx - mn) / 255 + 0.02; r += d[i] * w; gr += d[i + 1] * w; b += d[i + 2] * w; wt += w;
+      }
+      const n = d.length / 4, colourful = (wt - 0.02 * n) / n > 0.08;
+      document.documentElement.style.setProperty('--cast',
+        colourful ? `hsl(from rgb(${r / wt} ${gr / wt} ${b / wt}) h clamp(25, s, 60) 60)` : '#6f8fc9');
+    };
+    img.src = `listener://localhost/art/${show}`;
+  });
 
   const SPEEDS = [1, 1.2, 1.4, 1.6, 2];
   let t = $state(0);
@@ -22,11 +52,19 @@
     {@const e = now.episode}
     <div class="now">
       <span class="cover"><img src="listener://localhost/art/{e.show_id}" alt="" /></span>
-      <div class="who"><h1 class="title">{e.title}</h1><span class="sub">{e.show_title}</span></div>
+      <div class="who">
+        <button class="title" aria-pressed={ui.notes} onclick={() => (ui.notes = !ui.notes)} title="Show notes">{e.title}</button>
+        <span class="sub">{e.show_title}</span>
+      </div>
     </div>
-    <div class="stage"></div>
+    <div class="stage"><Signal {mode} /></div>
     <div class="tp">
-      <span class="side"><span class="num">{fmt(t)}</span></span>
+      <span class="side">
+        <span class="num">{fmt(t)}</span>
+        <span class="vz" role="group" aria-label="Visualization">
+          {#each MODES as m}<button aria-pressed={mode === m} onclick={() => setPref('viz', m)}>{m}</button>{/each}
+        </span>
+      </span>
       <span class="ctl">
         <button class="ico" aria-label="Back 15 seconds" onclick={() => player.skip(-15)}><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M4.6 8.4A6 6 0 1 1 4 12"/><path d="M4 4.6v3.9h3.9"/></svg></button>
         <button class="play" aria-label={now.playing ? 'Pause' : 'Play'} onclick={player.toggle}>
@@ -54,11 +92,16 @@
   .cover { display: block; aspect-ratio: 1; width: 100%; border-radius: 9px; overflow: hidden; background: var(--hair); }
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .who { min-width: 0; }
-  .title { max-width: 22ch; font-weight: 250; font-size: 28px; line-height: 1.18; letter-spacing: -0.012em; margin: 0 0 4px; text-wrap: balance;
+  .title { width: 100%; text-align: left; max-width: 22ch; font-weight: 250; font-size: 28px; line-height: 1.18; letter-spacing: -0.012em; margin: 0 0 4px; text-wrap: balance;
     display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .stage { min-height: 0; }
+  .title:hover { color: var(--accent); }
+  .stage { min-height: 0; display: grid; align-items: center; }
+  .vz { display: flex; gap: 12px; }
+  .vz button { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); transition: color 0.14s ease; }
+  .vz button:hover { color: var(--text-dim); }
+  .vz button[aria-pressed="true"] { color: var(--text); }
   .tp { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; margin-top: 6px; }
-  .side { display: flex; align-items: center; gap: 18px; }
+  .side { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
   .side.end { justify-content: flex-end; }
   .ctl { display: flex; align-items: center; gap: 30px; }
   .ico { color: var(--text-dim); display: grid; place-items: center; width: 28px; height: 28px; transition: color 0.14s ease; }

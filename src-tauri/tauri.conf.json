@@ -16,6 +16,9 @@
         "title": "Listener",
         "width": 1080,
         "height": 700,
+        "minWidth": 1040,
+        "minHeight": 660,
+        "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": { "x": 17, "y": 26 }
