@@ -191,6 +191,32 @@ fn log(msg: String) {
 }
 
 #[tauri::command]
+fn unfollow(app: AppHandle, core: State<Core>, show_id: i64) -> R<()> {
+    // The episode playing now keeps playing; its show just leaves the library.
+    let files = store::unfollow(&core.db.lock().unwrap(), show_id).map_err(err)?;
+    for f in files {
+        let _ = std::fs::remove_file(f);
+    }
+    if let Ok(dir) = app.path().app_data_dir() {
+        let _ = std::fs::remove_file(dir.join("art").join(show_id.to_string()));
+    }
+    library_changed(&app);
+    Ok(())
+}
+
+/// Point a show at a feed address the person supplies: a Spotify-only show, or a wrong match.
+#[tauri::command]
+async fn correct_feed(app: AppHandle, show_id: i64, url: String) -> R<String> {
+    let (id, title) = ingest(&app, url.trim()).await?;
+    if id != show_id {
+        let core = app.state::<Core>();
+        let _ = store::unfollow(&core.db.lock().unwrap(), show_id);
+    }
+    library_changed(&app);
+    Ok(title)
+}
+
+#[tauri::command]
 fn episode_notes(core: State<Core>, id: i64) -> R<Option<String>> {
     store::description(&core.db.lock().unwrap(), id).map_err(err)
 }
@@ -290,7 +316,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
             play::playback, play::player_ready, play::choose, play::toggle, play::seek, play::skip,
-            play::set_speed, play::report, play::peaks, episode_notes
+            play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

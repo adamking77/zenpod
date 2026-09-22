@@ -21,6 +21,8 @@ export const api = {
   shows: () => invoke<Show[]>('shows'),
   newest: () => invoke<Episode[]>('newest'),
   showEpisodes: (showId: number) => invoke<Episode[]>('show_episodes', { showId }),
+  unfollow: (showId: number) => invoke<void>('unfollow', { showId }),
+  correctFeed: (showId: number, url: string) => invoke<string>('correct_feed', { showId, url }),
   settings: () => invoke<Record<string, string>>('settings'),
   setSetting: (key: string, value: string) => invoke<void>('set_setting', { key, value }),
 };

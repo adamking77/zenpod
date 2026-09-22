@@ -228,3 +228,13 @@ pub fn set_peaks(db: &Connection, id: i64, blob: &[u8]) -> rusqlite::Result<()> 
 pub fn description(db: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
     db.query_row("select description from episodes where id = ?1", [id], |r| r.get(0))
 }
+
+/// Remove a show and its episodes; returns the files it leaves behind.
+pub fn unfollow(db: &Connection, show: i64) -> rusqlite::Result<Vec<String>> {
+    let files: Vec<String> = db
+        .prepare("select local_path from episodes where show_id = ?1 and local_path is not null")?
+        .query_map([show], |r| r.get(0))?
+        .collect::<Result<_, _>>()?;
+    db.execute("delete from shows where id = ?1", [show])?;
+    Ok(files)
+}

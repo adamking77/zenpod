@@ -42,7 +42,25 @@
     return () => { un.then((f) => f()); up.then((f) => f()); };
   });
 
+  let feedFix = $state(''), fixNote = $state(''), confirming = $state(false);
+
+  async function fix(ev: SubmitEvent) {
+    ev.preventDefault();
+    if (!open || !feedFix.trim()) return;
+    fixNote = 'Looking…';
+    try { const t = await api.correctFeed(open.id, feedFix); fixNote = `Now following ${t}.`; feedFix = ''; drill(null); }
+    catch (e) { fixNote = String(e); }
+  }
+
+  async function leave() {
+    if (!open) return;
+    if (!confirming) { confirming = true; return; }
+    await api.unfollow(open.id);
+    drill(null);
+  }
+
   async function drill(s: Show | null) {
+    confirming = false; fixNote = ''; feedFix = '';
     open = s;
     episodes = s ? await api.showEpisodes(s.id) : [];
     list.scrollTop = 0;
@@ -111,9 +129,16 @@
       <h2 class="show-h">{open.title}</h2>
       {#if open.about}<p class="show-p">{plain(open.about)}</p>{/if}
       {#if open.spotify_only}
-        <p class="show-p">This show only lives on Spotify, so it can't be played here.</p>
+        <p class="show-p">No public feed was found for this show, so it can't be played here. If it has one, paste its address below.</p>
       {/if}
       {#each episodes as e (e.id)}{@render row(e, false, `${date(e.published)} ·`)}{/each}
+      <div class="care">
+        <form onsubmit={fix}>
+          <input bind:value={feedFix} placeholder={open.spotify_only ? 'Its feed address' : 'Wrong show? Paste the right feed address'} aria-label="Feed address for this show" />
+        </form>
+        {#if fixNote}<p class="quiet">{fixNote}</p>{/if}
+        <button class="leave" onclick={leave}>{confirming ? 'Press again to stop following' : 'Stop following'}</button>
+      </div>
     {:else}
       {#each shows as s (s.id)}
         <button class="row show" onclick={() => drill(s)}>
@@ -159,5 +184,12 @@
   .show-p { color: var(--text-dim); font-size: 13.5px; margin: 0 0 14px; max-width: 38ch; display: -webkit-box; -webkit-line-clamp: 5; line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
   .new { color: var(--accent); }
   .note { font-size: 14px; line-height: 1.6; color: var(--text-mid); margin: 0 0 12px; max-width: 42ch; user-select: text; cursor: text; }
+  .care { margin: 26px 0 10px; padding-top: 18px; border-top: 1px solid var(--hair); display: grid; gap: 12px; justify-items: start; }
+  .care form { width: 100%; }
+  .care input { font: inherit; font-size: 13.5px; color: var(--text); background: none; border: 0; border-bottom: 1px solid var(--line); padding: 4px 0 6px; outline: none; width: 100%; }
+  .care input:focus { border-bottom-color: var(--accent); }
+  .care input::placeholder { color: var(--text-faint); }
+  .leave { font-size: 12.5px; color: var(--text-faint); }
+  .leave:hover { color: var(--failed); }
   .quiet { color: var(--text-dim); font-size: 13.5px; max-width: 32ch; margin-top: 8px; }
 </style>
