@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Listener</title>
     <script>
-      // Set the flavor before first paint so the window never flashes the wrong ground.
-      let look = ''; try { look = localStorage.getItem('listener.look') || ''; } catch {}
-      const night = look ? look === 'night' : matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.dataset.flavor = night ? 'mocha' : 'flat';
+      // The core sets each window's theme before it shows, so this is right on first paint.
+      document.documentElement.dataset.flavor = matchMedia('(prefers-color-scheme: dark)').matches ? 'mocha' : 'flat';
     </script>
     %sveltekit.head%
   </head>
