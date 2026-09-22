@@ -186,3 +186,32 @@ pub fn set_setting(db: &Connection, key: &str, value: &str) -> rusqlite::Result<
     )?;
     Ok(())
 }
+
+/// (downloaded file, remote address) for an episode.
+pub fn audio_source(db: &Connection, id: i64) -> rusqlite::Result<(Option<String>, String)> {
+    db.query_row("select local_path, audio_url from episodes where id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))
+}
+
+pub fn show_image(db: &Connection, show: i64) -> rusqlite::Result<Option<String>> {
+    db.query_row("select image_url from shows where id = ?1", [show], |r| r.get(0))
+}
+
+pub fn save_position(db: &Connection, id: i64, position: f64) -> rusqlite::Result<()> {
+    db.execute("update episodes set position = ?2 where id = ?1", params![id, position])?;
+    Ok(())
+}
+
+pub fn mark_played(db: &Connection, id: i64) -> rusqlite::Result<()> {
+    db.execute("update episodes set played = 1, position = 0 where id = ?1", [id])?;
+    Ok(())
+}
+
+pub fn set_duration(db: &Connection, id: i64, duration: f64) -> rusqlite::Result<()> {
+    db.execute("update episodes set duration = ?2 where id = ?1", params![id, duration])?;
+    Ok(())
+}
+
+pub fn set_local(db: &Connection, id: i64, path: Option<&str>) -> rusqlite::Result<()> {
+    db.execute("update episodes set local_path = ?2 where id = ?1", params![id, path])?;
+    Ok(())
+}

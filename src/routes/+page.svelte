@@ -1,21 +1,32 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Library from '$lib/Library.svelte';
+  import Listen from '$lib/Listen.svelte';
   import { loadPrefs } from '$lib/prefs.svelte';
-  import type { Episode } from '$lib/api';
+  import { follow, now, player } from '$lib/now.svelte';
 
-  let current = $state<number | null>(null);
+  onMount(() => {
+    loadPrefs();
+    const un = follow();
+    return () => { un.then((f) => f()); };
+  });
 
-  onMount(() => { loadPrefs(); });
-
-  function play(e: Episode) { current = e.id; }
+  function keys(e: KeyboardEvent) {
+    if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+    // Space on a focused button presses that button; anywhere else it plays and pauses.
+    if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); player.toggle(); }
+    if (e.key === 'ArrowLeft') player.skip(-15);
+    if (e.key === 'ArrowRight') player.skip(30);
+  }
 </script>
+
+<svelte:window onkeydown={keys} />
 
 <main class="win">
   <div class="drag" data-tauri-drag-region></div>
   <div class="panes">
-    <section class="listen" aria-label="Listening"></section>
-    <Library {current} onplay={play} />
+    <Listen />
+    <Library current={now.episode?.id ?? null} onplay={(e) => player.choose(e.id)} />
   </div>
 </main>
 
@@ -29,6 +40,5 @@
   }
   :global(:root[data-light="flat"]) .win::before { opacity: 0; }
   .drag { position: absolute; inset: 0 0 auto 0; height: 44px; z-index: 1; }
-  .panes { position: relative; display: grid; grid-template-columns: 1fr 400px; height: 100%; }
-  .listen { padding: 64px 48px 44px; }
+  .panes { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 400px; height: 100%; }
 </style>

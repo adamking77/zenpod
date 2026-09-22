@@ -1,17 +1,40 @@
 mod feed;
 #[cfg(target_os = "macos")]
 mod panel_test;
+mod play;
+mod proto;
 mod store;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 
 pub struct Core {
     db: Mutex<Connection>,
+    now: Mutex<play::Now>,
+    /// Episodes being saved to disk right now.
+    fetching: Mutex<HashSet<i64>>,
+    /// Enclosure addresses after their tracking redirects.
+    urls: Mutex<HashMap<i64, String>>,
+}
+
+/// Follow an enclosure's redirect chain once per session; range requests then go straight to the host.
+pub async fn resolved_url(app: &AppHandle, id: i64, remote: &str) -> String {
+    if let Some(u) = app.state::<Core>().urls.lock().unwrap().get(&id).cloned() {
+        return u;
+    }
+    let u = feed::HTTP
+        .get(remote)
+        .header("range", "bytes=0-0")
+        .send()
+        .await
+        .map(|r| r.url().to_string())
+        .unwrap_or_else(|_| remote.to_string());
+    app.state::<Core>().urls.lock().unwrap().insert(id, u.clone());
+    u
 }
 
 type R<T> = Result<T, String>;
@@ -160,6 +183,12 @@ async fn import_spotify(app: AppHandle, text: String) -> R<Imported> {
     Ok(imp)
 }
 
+/// Webview diagnostics into the app's stderr.
+#[tauri::command]
+fn log(msg: String) {
+    eprintln!("[web] {msg}");
+}
+
 #[tauri::command]
 fn shows(core: State<Core>) -> R<Vec<store::ShowRow>> {
     store::shows(&core.db.lock().unwrap()).map_err(err)
@@ -215,7 +244,14 @@ pub fn run() {
                     _ => None,
                 });
             }
-            app.manage(Core { db: Mutex::new(db) });
+            app.manage(Core {
+                db: Mutex::new(db),
+                now: Mutex::new(play::Now::default()),
+                fetching: Mutex::new(HashSet::new()),
+                urls: Mutex::new(HashMap::new()),
+            });
+            play::restore(app.handle());
+            play::spawn_player(app.handle())?;
 
             // Refresh quietly on launch, then hourly.
             let h = app.handle().clone();
@@ -232,9 +268,32 @@ pub fn run() {
             }
             Ok(())
         })
+        .register_asynchronous_uri_scheme_protocol("listener", |ctx, req, responder| {
+            let app = ctx.app_handle().clone();
+            tauri::async_runtime::spawn(async move { responder.respond(proto::handle(app, req).await) });
+        })
+        // Closing the window only hides it; the player window keeps playing.
+        .on_window_event(|w, e| {
+            if let WindowEvent::CloseRequested { api, .. } = e {
+                if w.label() == "main" {
+                    api.prevent_close();
+                    let _ = w.hide();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
-            add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting
+            log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
+            play::playback, play::player_ready, play::choose, play::toggle, play::seek, play::skip,
+            play::set_speed, play::report
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, e| {
+            if let RunEvent::Reopen { .. } = e {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+        });
 }
