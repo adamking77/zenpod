@@ -4,7 +4,8 @@
   import { api, length, plain, short, type Episode, type Show } from '$lib/api';
   import Settings from '$lib/Settings.svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { now } from '$lib/now.svelte';
+  import { chapters, now, player } from '$lib/now.svelte';
+  import { fmt } from '$lib/api';
   import { ui } from '$lib/ui.svelte';
 
   // Show notes as plain paragraphs: the feed's HTML is read for its text only.
@@ -114,6 +115,16 @@
       <button class="back" onclick={() => (ui.notes = false)}>← back</button>
       <h2 class="show-h">{now.episode.title}</h2>
       <p class="show-p sub">{now.episode.show_title} · {date(now.episode.published)}</p>
+      <button class="keep" aria-pressed={now.episode.kept} onclick={() => { const e = now.episode!; api.keep(e.id, !e.kept); e.kept = !e.kept; }}>
+        {now.episode.kept ? 'Kept offline · let it go' : 'Keep offline'}
+      </button>
+      {#if chapters.list.length}
+        <ol class="chapters">
+          {#each chapters.list as c}
+            <li><button onclick={() => player.seek(c.start)}><span class="num">{fmt(c.start)}</span><span>{c.title}</span></button></li>
+          {/each}
+        </ol>
+      {/if}
       {#each notes as n}<p class="note">{n}</p>{:else}<p class="quiet">This episode came without notes.</p>{/each}
     {:else if tab === 'settings'}
       <Settings />
@@ -183,6 +194,11 @@
   .show-h { font-weight: 250; font-size: 24px; line-height: 1.2; margin: 0 0 8px; }
   .show-p { color: var(--text-dim); font-size: 13.5px; margin: 0 0 14px; max-width: 38ch; display: -webkit-box; -webkit-line-clamp: 5; line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
   .new { color: var(--accent); }
+  .keep { font-size: 12.5px; color: var(--text-dim); margin: 0 0 18px; }
+  .keep:hover, .keep[aria-pressed="true"] { color: var(--accent); }
+  .chapters { list-style: none; padding: 0; margin: 0 0 22px; }
+  .chapters button { display: grid; grid-template-columns: 52px 1fr; gap: 8px; text-align: left; padding: 5px 0; font-size: 13.5px; color: var(--text-mid); width: 100%; }
+  .chapters button:hover { color: var(--accent); }
   .note { font-size: 14px; line-height: 1.6; color: var(--text-mid); margin: 0 0 12px; max-width: 42ch; user-select: text; cursor: text; }
   .care { margin: 26px 0 10px; padding-top: 18px; border-top: 1px solid var(--hair); display: grid; gap: 12px; justify-items: start; }
   .care form { width: 100%; }

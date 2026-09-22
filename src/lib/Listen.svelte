@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { fmt } from '$lib/api';
-  import { now, player, position } from '$lib/now.svelte';
+  import { chapterAt, loadChapters, now, player, position } from '$lib/now.svelte';
   import { prefs, setPref } from '$lib/prefs.svelte';
   import { ui } from '$lib/ui.svelte';
   import Signal from '$lib/Signal.svelte';
@@ -36,6 +36,9 @@
   const SPEEDS = [1, 1.2, 1.4, 1.6, 2];
   let t = $state(0);
 
+  $effect(() => { const id = now.episode?.id; if (id) loadChapters(id); });
+  const chapter = $derived(chapterAt(t));
+
   onMount(() => {
     let raf = 0;
     const tick = () => { t = position(); raf = requestAnimationFrame(tick); };
@@ -54,7 +57,7 @@
       <span class="cover"><img src="listener://localhost/art/{e.show_id}" alt="" /></span>
       <div class="who">
         <button class="title" aria-pressed={ui.notes} onclick={() => (ui.notes = !ui.notes)} title="Show notes">{e.title}</button>
-        <span class="sub">{e.show_title}</span>
+        <span class="sub">{e.show_title}{#if chapter?.title} · {chapter.title}{/if}</span>
       </div>
     </div>
     <div class="stage"><Signal {mode} /></div>

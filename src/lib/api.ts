@@ -8,7 +8,7 @@ export type Show = {
 export type Episode = {
   id: number; show_id: number; show_title: string; title: string;
   published: number | null; duration: number | null; position: number;
-  played: boolean; kept: boolean; image_url: string | null;
+  played: boolean; kept: boolean; offline: boolean; image_url: string | null;
 };
 
 export type Imported = { added: number; had: number; spotify_only: number; failed: number };
@@ -23,6 +23,7 @@ export const api = {
   showEpisodes: (showId: number) => invoke<Episode[]>('show_episodes', { showId }),
   unfollow: (showId: number) => invoke<void>('unfollow', { showId }),
   correctFeed: (showId: number, url: string) => invoke<string>('correct_feed', { showId, url }),
+  keep: (id: number, on: boolean) => invoke<void>('keep', { id, on }),
   settings: () => invoke<Record<string, string>>('settings'),
   setSetting: (key: string, value: string) => invoke<void>('set_setting', { key, value }),
 };

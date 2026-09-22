@@ -124,11 +124,12 @@ pub struct EpisodeRow {
     pub position: f64,
     pub played: bool,
     pub kept: bool,
+    pub offline: bool,
     pub image_url: Option<String>,
 }
 
 const EPISODE_COLS: &str = "e.id, e.show_id, s.title, e.title, e.published, e.duration, e.position,
-  e.played, e.kept, coalesce(s.image_url, e.image_url)";
+  e.played, e.kept, e.local_path is not null, coalesce(s.image_url, e.image_url)";
 
 fn episode_row(r: &rusqlite::Row) -> rusqlite::Result<EpisodeRow> {
     Ok(EpisodeRow {
@@ -141,7 +142,8 @@ fn episode_row(r: &rusqlite::Row) -> rusqlite::Result<EpisodeRow> {
         position: r.get(6)?,
         played: r.get(7)?,
         kept: r.get(8)?,
-        image_url: r.get(9)?,
+        offline: r.get(9)?,
+        image_url: r.get(10)?,
     })
 }
 
@@ -237,4 +239,20 @@ pub fn unfollow(db: &Connection, show: i64) -> rusqlite::Result<Vec<String>> {
         .collect::<Result<_, _>>()?;
     db.execute("delete from shows where id = ?1", [show])?;
     Ok(files)
+}
+
+pub fn chapters_url(db: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
+    db.query_row("select chapters_url from episodes where id = ?1", [id], |r| r.get(0))
+}
+
+pub fn set_kept(db: &Connection, id: i64, kept: bool) -> rusqlite::Result<()> {
+    db.execute("update episodes set kept = ?2 where id = ?1", params![id, kept])?;
+    Ok(())
+}
+
+/// Saved copies nobody asked to keep, of episodes already heard.
+pub fn spent_copies(db: &Connection) -> rusqlite::Result<Vec<(i64, String)>> {
+    db.prepare("select id, local_path from episodes where local_path is not null and kept = 0 and played = 1")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect()
 }

@@ -1,6 +1,7 @@
 // @ts-nocheck
 // The Zen Futurism audio reader's Field, Thread, Orbit and tether, as pass 7 ported them (resting Orbit
-// holds the episode's loudness; light flavors carry 1.6x ink). Copied from mockups/listener-pass7.html.
+// holds the episode's loudness; light flavors carry 1.6x ink), with the refinements in mockups/waveform-refine.html:
+// crisp Field bars with played ones in the accent, two Thread strands, a calmer 72-ray Orbit.
 
 /* --accent is var(--blue) etc.; canvas needs the computed colour. */
 function resolved(root, name){ const p = document.createElement('i'); p.style.color = `var(${name})`; p.style.display = 'none';
@@ -18,19 +19,11 @@ export function updateSignal(el, active, env){
   const T = SIG.targets;
   if (active && performance.now() - FED.at < 250){
     te = FED.te; tp = FED.tp; T.set(FED.bands);
-  } else if (active){
-    const t = SIG.t, syl = .45 + .55*Math.abs(Math.sin(t*Math.PI*4.3 + Math.sin(t*1.7)*1.4));
-    const breath = Math.sin(t*.63) < -.88 ? .15 : 1;
-    te = Math.min(1, (.22 + env*.6)*syl*breath);
-    tp = te*(.62 + .25*Math.sin(t*3.1));
-    const f1 = .16 + .05*Math.sin(t*5.1), f2 = .42 + .09*Math.sin(t*3.7 + 1), f3 = .7 + .06*Math.sin(t*2.3);
-    for (let i=0;i<48;i++){ const p = i/47, g = (c,w) => Math.exp(-((p-c)*(p-c))/(2*w*w));
-      T[i] = Math.min(1, te*1.25*(g(f1,.07) + g(f2,.07)*.8 + g(f3,.09)*.5)*(.8 + .2*Math.sin(i*1.7 + t*9))); }
   } else T.fill(0);
   SIG.pulse = te;
-  SIG.energy += (te - SIG.energy)*smooth(el, te > SIG.energy ? 42 : 138);
+  SIG.energy += (te - SIG.energy)*smooth(el, te > SIG.energy ? 36 : 130);
   SIG.presence += (tp - SIG.presence)*smooth(el, 96);
-  for (let i=0;i<48;i++){ const sp = T[Math.max(0,i-1)]*.22 + T[i]*.56 + T[Math.min(47,i+1)]*.22; SIG.bands[i] += (sp - SIG.bands[i])*smooth(el, sp > SIG.bands[i] ? 56 : 175); }
+  for (let i=0;i<48;i++){ const sp = T[Math.max(0,i-1)]*.22 + T[i]*.56 + T[Math.min(47,i+1)]*.22; SIG.bands[i] += (sp - SIG.bands[i])*smooth(el, sp > SIG.bands[i] ? 40 : 140); }
 }
 
 export function makeViz(canvas, kind){ return { canvas, kind, ctx: canvas.getContext('2d'), thread:new Float32Array(3), phases:new Float32Array([.35,2.15,4.45]), tPulse:0, rays:new Float32Array(96), oPulse:0, oPhase:.35, last:0 }; }
@@ -43,25 +36,28 @@ export function resolveColors(){ const root = document.documentElement, cs = get
 function samplePeaks(peaks, count){
   return Array.from({length:count}, (_, i) => { const a = Math.floor(i/count*peaks.length), b = Math.max(a+1, Math.floor((i+1)/count*peaks.length)); let m = 0; for (let k=a;k<b;k++) m = Math.max(m, peaks[k]||0); return m; });
 }
-export function drawField(c, w, h, center, progress, peaks){
-  const count = Math.max(72, Math.floor(w/(w < 520 ? 4 : 4.8))), data = samplePeaks(peaks, count), gap = w/count;
-  const datumX = Math.min(w-5, Math.max(5, progress*w)), win = w*(w < 520 ? .24 : .17), amps = [];
-  c.strokeStyle = INK; c.lineWidth = 1;
-  data.forEach((v, i) => {
-    const x = (i+.5)*gap, wake = x <= datumX ? win*1.2 : win*.58, d = Math.abs(x-datumX)/wake, loc = Math.max(0, 1-d), le = loc*loc*(3-2*loc);
-    const sp = sampleField((x - (datumX - win*1.2))/(win*1.78));
-    const quiet = .024 + Math.pow(Math.max(.02, v), .82)*.07, act = le*(SIG.energy*.04 + sp*.14 + SIG.presence*.035);
-    const a = Math.min(h*.43, Math.max(1.4, h*(quiet + act))); amps.push(a);
-    c.globalAlpha = Math.min(1, ((x <= datumX ? .22 : .11) + le*.05)*INKK); c.beginPath(); c.moveTo(x, center-a); c.lineTo(x, center+a); c.stroke();
-  });
-  c.globalAlpha = .08*INKK; c.beginPath();
-  amps.forEach((a,i) => { const x = (i+.5)*gap; i ? c.lineTo(x, center-a) : c.moveTo(x, center-a); });
-  for (let i=amps.length-1;i>=0;i--) c.lineTo((i+.5)*gap, center+amps[i]);
-  c.closePath(); c.stroke();
-  c.globalAlpha = .1*INKK; c.beginPath(); c.moveTo(0, center); c.lineTo(w, center); c.stroke();
-  c.strokeStyle = SIGNAL; c.globalAlpha = .82; c.lineWidth = 1.25; c.beginPath(); c.moveTo(0, center); c.lineTo(datumX, center); c.stroke();
-  c.fillStyle = SIGNAL; c.globalAlpha = .9; c.beginPath(); c.arc(datumX, center, 4.2, 0, Math.PI*2); c.fill();
+export function drawField(c, w, h, center, progress, peaks, inset = 0){
+  /* Bars run the full width and fade at the ends; the episode itself spans [inset, w - inset]. */
+  const x0 = inset, span = Math.max(1, w - inset*2);
+  const count = Math.max(60, Math.floor(w/(w < 520 ? 4.8 : 5.6))), gap = w/count;
+  const datumX = x0 + Math.min(span, Math.max(0, progress*span)), win = span*(w < 520 ? .26 : .2);
+  const at = x => { const q = Math.max(0, Math.min(1, (x - x0)/span)); return peaks[Math.min(peaks.length-1, Math.floor(q*peaks.length))] || 0; };
+  c.lineWidth = 1;
+  for (let i=0; i<count; i++){
+    const x = Math.round((i+.5)*gap) + .5, v = at(x), wake = x <= datumX ? win*1.2 : win*.6, d = Math.abs(x-datumX)/wake, loc = Math.max(0, 1-d), le = loc*loc*(3-2*loc);
+    const sp = sampleField((x - (datumX - win*1.2))/(win*1.8));
+    const quiet = .024 + Math.pow(Math.max(.02, v), .8)*.09, act = le*(SIG.energy*.05 + sp*.18 + SIG.presence*.04);
+    /* soft ceiling: loud moments keep their detail instead of flattening against a cap */
+    const a = Math.round(Math.max(1, h*.43*(1 - Math.exp(-(quiet + act)/.43))));
+    const played = x >= x0 && x <= datumX; c.strokeStyle = played ? SIGNAL : INK;
+    c.globalAlpha = played ? Math.min(1, .34 + le*.2) : Math.min(1, (.12 + le*.1)*INKK); c.beginPath(); c.moveTo(x, center-a); c.lineTo(x, center+a); c.stroke();
+  }
+  const y = Math.round(center) + .5;
+  c.strokeStyle = INK; c.globalAlpha = .08*INKK; c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke();
+  c.strokeStyle = SIGNAL; c.globalAlpha = .82; c.lineWidth = 1.25; c.beginPath(); c.moveTo(x0, center); c.lineTo(datumX, center); c.stroke();
+  c.fillStyle = SIGNAL; c.globalAlpha = 1; c.beginPath(); c.arc(datumX, center, 3.6, 0, Math.PI*2); c.fill();
 }
+
 export function drawThread(V, c, w, h, center, progress, peaks, active, el){
   const datumX = Math.min(w-5, Math.max(5, progress*w)), win = w*(w < 520 ? .4 : .28);
   const env = peaks[Math.min(peaks.length-1, Math.floor(progress*peaks.length))] || 0;
@@ -71,7 +67,7 @@ export function drawThread(V, c, w, h, center, progress, peaks, active, el){
   const E = SIG.energy, P = SIG.pulse, R = SIG.presence;
   const tg = active ? [Math.min(.94, E*.48+P*.22+body*.22+env*.34*.08), Math.min(.76, E*.28+P*.18+voice*.22+R*.12), Math.min(.58, E*.16+P*.14+detail*.18+R*.1)] : [0,0,0];
   for (let i=0;i<3;i++){ V.thread[i] += (tg[i]-V.thread[i])*smooth(el, tg[i] > V.thread[i] ? 18+i*6 : 72+i*12); if (active) V.phases[i] += el*.0016*(1+i*.23); }
-  c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = 1; c.strokeStyle = INK; c.globalAlpha = .18*INKK;
+  c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = 1; c.strokeStyle = INK; c.globalAlpha = .1*INKK;
   c.beginPath(); c.moveTo(0, center); c.lineTo(w, center); c.stroke();
   c.strokeStyle = SIGNAL; c.globalAlpha = .82; c.lineWidth = 1.25; c.beginPath(); c.moveTo(0, center); c.lineTo(datumX, center); c.stroke();
   const start = Math.max(0, datumX-win), end = Math.min(w, datumX+win), n = Math.max(80, Math.min(180, Math.floor((end-start)/2.2)));
@@ -99,19 +95,20 @@ export function drawThread(V, c, w, h, center, progress, peaks, active, el){
     }
     c.stroke();
   };
-  for (let fi=2; fi>=0; fi--){ boundary(fam[fi], fi, 1); boundary(fam[fi], fi, -1); }
-  c.fillStyle = SIGNAL; c.globalAlpha = .94; c.beginPath(); c.arc(datumX, center, 4, 0, Math.PI*2); c.fill();
+  for (let fi=1; fi>=0; fi--){ boundary(fam[fi], fi, 1); boundary(fam[fi], fi, -1); }
+  c.fillStyle = SIGNAL; c.globalAlpha = 1; c.beginPath(); c.arc(datumX, center, 3.6, 0, Math.PI*2); c.fill();
 }
+
 const circDist = (p, c) => { const d = Math.abs(p-c); return Math.min(d, 1-d); };
 const cluster = p => { const g = (c,w,wt) => { const d = circDist(p,c); return Math.exp(-(d*d)/(2*w*w))*wt; }; return Math.min(1, g(.04,.082,.82)+g(.27,.052,.68)+g(.56,.115,.76)+g(.82,.067,.94)); };
 export function drawOrbit(V, c, w, h, progress, peaks, active, el, opts = {}){
   const diameter = Math.max(1, Math.min(w, h)), cx = w/2, cy = h/2, small = opts.small;
-  const inner = diameter*(opts.inner || .165), rayStart = inner + Math.max(4, diameter*.022), maxRay = diameter*(opts.maxRay || .295), n = opts.rays || 96;
+  const inner = diameter*(opts.inner || .165), rayStart = inner + Math.max(6, diameter*.03), maxRay = diameter*(opts.maxRay || .295), n = opts.rays || 72;
   const pt = active ? Math.min(1, SIG.energy*.88 + SIG.presence*.44) : 0;
   V.oPulse += (pt - V.oPulse)*smooth(el, pt > V.oPulse ? 22 : 78);
   if (active) V.oPhase = (V.oPhase + el*.00265*(.82 + SIG.energy*.72 + V.oPulse*.55)) % (Math.PI*2);
   const env = peaks[Math.min(peaks.length-1, Math.floor(progress*peaks.length))] || 0;
-  c.lineCap = 'round'; c.strokeStyle = INK; c.lineWidth = small ? .7 : .82;
+  c.lineCap = 'round'; c.strokeStyle = INK; c.lineWidth = small ? .7 : 1;
   for (let i=0;i<n;i++){
     const p = i/n, ang = p*Math.PI*2 - Math.PI/2, bp = (p*1.72 + .08 + Math.sin(i*1.93 + V.oPhase*.42)*.032 + 1) % 1;
     const fine = (Math.sin(i*1.31+.35)+1)/2, cl = (.14 + cluster(p)*.86)*(.76 + fine*.24);
@@ -125,12 +122,13 @@ export function drawOrbit(V, c, w, h, progress, peaks, active, el, opts = {}){
     const co = Math.cos(ang), si = Math.sin(ang);
     const played = p <= progress;
     c.strokeStyle = played ? SIGNAL : INK;
-    c.globalAlpha = played ? Math.min(.95, .62 + lv*.4) : Math.min(1, (.13 + Math.min(.32, lv*(.32 + V.oPulse*.08)))*INKK);
+    c.globalAlpha = played ? Math.min(.8, .42 + lv*.36) : Math.min(1, (.14 + Math.min(.26, lv*(.28 + V.oPulse*.08)))*INKK);
     c.beginPath(); c.moveTo(cx+co*rayStart, cy+si*rayStart); c.lineTo(cx+co*(rayStart+len), cy+si*(rayStart+len)); c.stroke();
   }
-  c.strokeStyle = INK; c.globalAlpha = .2*INKK; c.lineWidth = 1; c.beginPath(); c.arc(cx, cy, inner, 0, Math.PI*2); c.stroke();
-  c.strokeStyle = SIGNAL; c.globalAlpha = .9; c.lineWidth = small ? 1.3 : 1.6; c.beginPath(); c.arc(cx, cy, inner, -Math.PI/2, -Math.PI/2 + Math.PI*2*progress); c.stroke();
+  c.strokeStyle = INK; c.globalAlpha = .12*INKK; c.lineWidth = 1; c.beginPath(); c.arc(cx, cy, inner, 0, Math.PI*2); c.stroke();
+  c.strokeStyle = SIGNAL; c.globalAlpha = .9; c.lineWidth = small ? 1.2 : 1.3; c.beginPath(); c.arc(cx, cy, inner, -Math.PI/2, -Math.PI/2 + Math.PI*2*progress); c.stroke();
 }
+
 /* the tether thread from the component's sticky control, used in the pill panel */
 export function drawTether(V, c, w, h, center, progress, active){
   const inset = Math.min(9, w*.08), start = inset, end = w - inset, n = Math.max(40, Math.floor(end-start));
@@ -147,3 +145,28 @@ export function drawTether(V, c, w, h, center, progress, active){
   const dx = start + progress*(end-start); c.fillStyle = SIGNAL; c.globalAlpha = .9; c.beginPath(); c.arc(dx, center, 2.6, 0, Math.PI*2); c.fill();
 }
 
+
+/* Chapters, in the schematic grammar: open circles on the line (on the ring for the Orbit), accent once passed. */
+export function drawChapters(c, w, h, mode, starts, duration, progress){
+  if (!duration || !starts.length) return;
+  c.lineWidth = 1;
+  for (const t of starts){
+    const p = t/duration; if (p <= 0.002 || p >= 1) continue;
+    let x, y;
+    if (mode === 'orbit'){ const d = Math.min(w, h), r = d*.165, a = p*Math.PI*2 - Math.PI/2; x = w/2 + Math.cos(a)*r; y = h/2 + Math.sin(a)*r; }
+    else { x = p*w; y = h/2; }
+    const passed = p <= progress;
+    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--base').trim() || '#000';
+    c.strokeStyle = passed ? SIGNAL : INK; c.globalAlpha = passed ? .9 : Math.min(1, .45*INKK);
+    c.beginPath(); c.arc(x, y, 3, 0, Math.PI*2); c.globalAlpha = 1; c.fill();
+    c.globalAlpha = passed ? .9 : Math.min(1, .45*INKK); c.stroke();
+  }
+}
+
+/* The timeline lives in the clear middle; only a faint baseline runs on into the faded edges. */
+export const INSET = .1;
+export function drawMargins(c, w, h){
+  const i = Math.round(w*INSET), y = Math.round(h/2) + .5;
+  c.strokeStyle = INK; c.lineWidth = 1; c.globalAlpha = .08*INKK;
+  c.beginPath(); c.moveTo(0, y); c.lineTo(i, y); c.moveTo(w - i, y); c.lineTo(w, y); c.stroke();
+}

@@ -232,6 +232,82 @@ fn measure(app: AppHandle, id: i64, path: std::path::PathBuf) {
     });
 }
 
+#[derive(Serialize, serde::Deserialize, Clone)]
+pub struct Chapter {
+    title: String,
+    #[serde(rename = "startTime")]
+    start: f64,
+}
+
+/// Podcast Namespace chapters, fetched once and kept beside the audio so they work offline.
+#[tauri::command]
+pub async fn chapters(app: AppHandle, id: i64) -> Vec<Chapter> {
+    #[derive(serde::Deserialize)]
+    struct File {
+        chapters: Vec<Raw>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Raw {
+        #[serde(default)]
+        title: String,
+        #[serde(rename = "startTime")]
+        start: f64,
+        #[serde(default = "yes")]
+        toc: bool,
+    }
+    fn yes() -> bool {
+        true
+    }
+    let Ok(dir) = app.path().app_data_dir().map(|d| d.join("chapters")) else { return vec![] };
+    let file = dir.join(format!("{id}.json"));
+    let text = match std::fs::read_to_string(&file) {
+        Ok(t) => t,
+        Err(_) => {
+            let Some(url) = store::chapters_url(&app.state::<Core>().db.lock().unwrap(), id).ok().flatten() else { return vec![] };
+            let Ok(t) = async { HTTP.get(&url).send().await?.error_for_status()?.text().await }.await else { return vec![] };
+            let _ = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, &t));
+            t
+        }
+    };
+    serde_json::from_str::<File>(&text)
+        .map(|f| f.chapters.into_iter().filter(|c| c.toc).map(|c| Chapter { title: c.title, start: c.start }).collect())
+        .unwrap_or_default()
+}
+
+/// Keep an episode offline, or let it go.
+#[tauri::command]
+pub fn keep(app: AppHandle, core: State<Core>, id: i64, on: bool) -> R<()> {
+    let current = core.now.lock().unwrap().episode.as_ref().map(|e| e.id);
+    {
+        let db = core.db.lock().unwrap();
+        store::set_kept(&db, id, on).map_err(err)?;
+        if !on && current != Some(id) {
+            if let Some(p) = store::audio_source(&db, id).map_err(err)?.0 {
+                let _ = std::fs::remove_file(p);
+            }
+            store::set_local(&db, id, None).map_err(err)?;
+        }
+    }
+    let _ = app.emit("episode", id);
+    if on {
+        cache(app, id);
+    }
+    Ok(())
+}
+
+/// On launch: remove saved copies of heard episodes that weren't kept.
+pub fn tidy(app: &AppHandle) {
+    let core = app.state::<Core>();
+    let db = core.db.lock().unwrap();
+    let current = core.now.lock().unwrap().episode.as_ref().map(|e| e.id);
+    for (id, path) in store::spent_copies(&db).unwrap_or_default() {
+        if Some(id) != current {
+            let _ = std::fs::remove_file(&path);
+            let _ = store::set_local(&db, id, None);
+        }
+    }
+}
+
 /// Keep a copy of what's playing on disk: it plays offline from then on, and M3 reads its loudness.
 pub fn cache(app: AppHandle, id: i64) {
     {

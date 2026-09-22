@@ -31,6 +31,11 @@
       an = ctx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.72;
       src.connect(an); an.connect(ctx.destination);
       td = new Uint8Array(an.fftSize); fd = new Uint8Array(an.frequencyBinCount);
+      // Hidden windows get their timers throttled to once a second; the audio callback isn't, so it paces the reading.
+      // ponytail: ScriptProcessor is deprecated but everywhere; an AudioWorklet if WebKit ever drops it.
+      const pace = ctx.createScriptProcessor(1024, 1, 1);
+      pace.onaudioprocess = listenIn;
+      an.connect(pace); pace.connect(ctx.destination);
     } catch (e) { invoke('log', { msg: `analyser: ${e}` }); }
   }
 
@@ -81,7 +86,6 @@
       if (t - last > 250) { last = t; report(); }
     });
     audio.addEventListener('play', graph);
-    const tick = setInterval(listenIn, 33);
     for (const ev of ['play', 'pause', 'seeked', 'loadedmetadata', 'error']) audio.addEventListener(ev, () => report());
     audio.addEventListener('error', () => invoke('log', { msg: `audio error ${audio.error?.code} ${audio.error?.message} ${audio.src}` }));
     audio.addEventListener('ended', () => report(true));
@@ -99,7 +103,7 @@
     invoke('log', { msg: 'player mounted' });
     const un = listen<Cmd>('cmd', (e) => run(e.payload));
     un.then(() => invoke('player_ready'));
-    return () => { clearInterval(tick); un.then((f) => f()); };
+    return () => un.then((f) => f());
   });
 </script>
 

@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { drawField, drawOrbit, drawThread, feed, makeViz, resolveColors, updateSignal } from '$lib/signal.js';
-  import { now, player, position } from '$lib/now.svelte';
+  import { INSET, drawChapters, drawField, drawMargins, drawOrbit, drawThread, feed, makeViz, resolveColors, updateSignal } from '$lib/signal.js';
+  import { chapters, now, player, position } from '$lib/now.svelte';
 
   let { mode }: { mode: 'field' | 'thread' | 'orbit' } = $props();
 
@@ -22,7 +22,7 @@
     if (id) load(id);
   });
   // Anything that changes the picture draws it again and lets it settle.
-  $effect(() => { void [mode, now.playing, now.position, now.duration]; settle = 60; });
+  $effect(() => { void [mode, now.playing, now.position, now.duration, chapters.list]; settle = 60; });
 
   onMount(() => {
     const V = makeViz(canvas, 'main');
@@ -34,8 +34,7 @@
     const mo = new MutationObserver(recolor);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-flavor', 'style'] });
     const bc = new BroadcastChannel('signal');
-    let heard = false;
-    bc.onmessage = (e) => { feed(e.data); if (!heard) { heard = true; invoke('log', { msg: 'signal reaches the main window' }); } };
+    bc.onmessage = (e) => feed(e.data);
     const un = listen<number>('peaks', (e) => { if (e.payload === now.episode?.id) load(e.payload); });
 
     let last = performance.now(), raf = 0;
@@ -50,9 +49,17 @@
         if (canvas.width !== Math.round(w * r) || canvas.height !== Math.round(h * r)) { canvas.width = Math.round(w * r); canvas.height = Math.round(h * r); }
         const c = canvas.getContext('2d')!;
         c.setTransform(r, 0, 0, r, 0, 0); c.clearRect(0, 0, w, h); c.globalAlpha = 1;
-        if (mode === 'field') drawField(c, w, h, h / 2, prog, peaks);
-        else if (mode === 'thread') drawThread(V, c, w, h, h / 2, prog, peaks, active, el);
-        else drawOrbit(V, c, w, h, prog, peaks, active, el);
+        const marks = chapters.list.map((k) => k.start);
+        if (mode === 'orbit') {
+          drawOrbit(V, c, w, h, prog, peaks, active, el);
+          drawChapters(c, w, h, mode, marks, now.duration, prog);
+        } else {
+          // The episode starts and ends just inside the faded edges, never within them.
+          const i = Math.round(w * INSET), iw = w - 2 * i;
+          if (mode === 'field') drawField(c, w, h, h / 2, prog, peaks, i);
+          else { drawMargins(c, w, h); c.save(); c.translate(i, 0); drawThread(V, c, iw, h, h / 2, prog, peaks, active, el); c.restore(); }
+          c.save(); c.translate(i, 0); drawChapters(c, iw, h, mode, marks, now.duration, prog); c.restore();
+        }
         if (!active) settle--;
       }
       raf = requestAnimationFrame(frame);
@@ -64,7 +71,7 @@
   function seekAt(e: PointerEvent) {
     if (!now.duration) return;
     const r = canvas.getBoundingClientRect();
-    let f = (e.clientX - r.left) / r.width;
+    let f = (e.clientX - r.left - r.width * INSET) / (r.width * (1 - 2 * INSET));
     if (mode === 'orbit') {
       let a = Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) + Math.PI / 2;
       if (a < 0) a += Math.PI * 2;
@@ -79,7 +86,7 @@
 
 <style>
   canvas { display: block; width: 100%; height: 280px; cursor: pointer;
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%);
-    mask-image: linear-gradient(90deg, transparent 0, #000 16%, #000 84%, transparent 100%); }
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%); }
   canvas.orbit { height: 340px; -webkit-mask-image: none; mask-image: none; }
 </style>

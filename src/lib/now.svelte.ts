@@ -24,3 +24,17 @@ export const player = {
   skip: (by: number) => invoke('skip', { by }),
   speed: (speed: number) => invoke('set_speed', { speed }),
 };
+
+export type Chapter = { title: string; start: number };
+
+// The chapters of whatever is loaded, from the feed. Empty when the feed has none.
+export const chapters = $state<{ list: Chapter[]; for: number | null }>({ list: [], for: null });
+
+export async function loadChapters(id: number) {
+  chapters.for = id;
+  chapters.list = [];
+  const list = await invoke<Chapter[]>('chapters', { id });
+  if (chapters.for === id) chapters.list = list;
+}
+
+export const chapterAt = (t: number) => chapters.list.findLast((c) => c.start <= t + 0.5) ?? null;
