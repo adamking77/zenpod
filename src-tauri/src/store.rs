@@ -256,3 +256,7 @@ pub fn spent_copies(db: &Connection) -> rusqlite::Result<Vec<(i64, String)>> {
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect()
 }
+
+pub fn transcript_url(db: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
+    db.query_row("select transcript_url from episodes where id = ?1", [id], |r| r.get(0))
+}

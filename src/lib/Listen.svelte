@@ -65,7 +65,18 @@
       </span>
     </div>
   {:else}
-    <p class="quiet">The room is quiet. Choose an episode on the right.</p>
+    <div class="first">
+      <p class="scene">The room is quiet.</p>
+      {#if ui.empty}
+        <p class="sub">Bring your shows in to begin.</p>
+        <span class="ways">
+          <button onclick={() => { ui.notes = false; ui.tab = 'settings'; }}>Bring my list</button>
+          <button onclick={() => { ui.notes = false; ui.tab = 'settings'; ui.paste = true; }}>Paste an address</button>
+        </span>
+      {:else}
+        <p class="sub">Choose an episode on the right.</p>
+      {/if}
+    </div>
   {/if}
 </section>
 
@@ -93,5 +104,9 @@
   .play:hover { box-shadow: inset 0 0 0 1px var(--accent); }
   .spd { color: var(--text-faint); transition: color 0.14s ease; }
   .spd:hover { color: var(--text); }
-  .quiet { align-self: center; color: var(--text-dim); font-size: 14px; grid-row: 2; }
+  .first { grid-row: 2; align-self: center; }
+  .scene { font-weight: 250; font-size: 28px; line-height: 1.2; margin: 0 0 6px; }
+  .ways { display: flex; gap: 22px; margin-top: 18px; }
+  .ways button { font-size: 14px; color: var(--text); transition: color 0.14s ease; }
+  .ways button:hover { color: var(--accent); }
 </style>

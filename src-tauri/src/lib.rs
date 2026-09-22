@@ -252,7 +252,7 @@ fn set_setting(app: AppHandle, core: State<Core>, key: String, value: String) ->
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init()).plugin(
         tauri_plugin_window_state::Builder::new()
@@ -319,7 +319,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
             play::playback, play::player_ready, play::choose, play::toggle, play::seek, play::skip,
-            play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::keep,
+            play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::transcript, play::keep,
             modes::set_mode, modes::pill_panel
         ])
         .build(tauri::generate_context!())

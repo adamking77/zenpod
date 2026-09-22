@@ -238,21 +238,30 @@ pub struct Chapter {
     start: f64,
 }
 
-/// Podcast Namespace chapters, fetched once and kept beside the audio so they work offline.
+/// A feed-linked file (chapters, transcript) fetched once and kept on disk so it works offline.
+async fn kept_text(app: &AppHandle, kind: &str, id: i64, url: Option<String>) -> Option<String> {
+    let dir = app.path().app_data_dir().ok()?.join(kind);
+    let file = dir.join(format!("{id}.txt"));
+    if let Ok(t) = std::fs::read_to_string(&file) {
+        return Some(t);
+    }
+    let t = async { HTTP.get(url?).send().await.ok()?.error_for_status().ok()?.text().await.ok() }.await?;
+    let _ = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, &t));
+    Some(t)
+}
+
+/// Podcast Namespace chapters, when the feed has them.
 #[tauri::command]
 pub async fn chapters(app: AppHandle, id: i64) -> Vec<Chapter> {
-    let Ok(dir) = app.path().app_data_dir().map(|d| d.join("chapters")) else { return vec![] };
-    let file = dir.join(format!("{id}.json"));
-    let text = match std::fs::read_to_string(&file) {
-        Ok(t) => t,
-        Err(_) => {
-            let Some(url) = store::chapters_url(&app.state::<Core>().db.lock().unwrap(), id).ok().flatten() else { return vec![] };
-            let Ok(t) = async { HTTP.get(&url).send().await?.error_for_status()?.text().await }.await else { return vec![] };
-            let _ = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, &t));
-            t
-        }
-    };
-    parse_chapters(&text)
+    let url = store::chapters_url(&app.state::<Core>().db.lock().unwrap(), id).ok().flatten();
+    kept_text(&app, "chapters", id, url).await.map(|t| parse_chapters(&t)).unwrap_or_default()
+}
+
+/// The episode's transcript as published (WebVTT, SRT, JSON or text); the page reads it.
+#[tauri::command]
+pub async fn transcript(app: AppHandle, id: i64) -> Option<String> {
+    let url = store::transcript_url(&app.state::<Core>().db.lock().unwrap(), id).ok().flatten()?;
+    kept_text(&app, "transcripts", id, Some(url)).await
 }
 
 /// Chapters meant for the table of contents (`toc: false` ones are skipped), in file order.

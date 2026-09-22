@@ -1,6 +1,9 @@
 <script lang="ts">
   import { api, type Imported } from '$lib/api';
   import { ACCENTS, prefs, setPref } from '$lib/prefs.svelte';
+  import { ui } from '$lib/ui.svelte';
+  let field: HTMLInputElement;
+  $effect(() => { if (ui.paste && field) { field.focus(); ui.paste = false; } });
 
   let address = $state('');
   let note = $state('');
@@ -67,7 +70,7 @@
     <div class="lbl">Bring your shows</div>
     <div class="imp">
       <form onsubmit={add}>
-        <input bind:value={address} disabled={busy} placeholder="A feed address, or a show's name" aria-label="A feed address, or a show's name" />
+        <input bind:this={field} bind:value={address} disabled={busy} placeholder="A feed address, or a show's name" aria-label="A feed address, or a show's name" />
       </form>
       <label><span>From a list of shows</span><span class="sub">An OPML file, from Overcast, Pocket Casts or most other podcast apps</span>
         <input type="file" accept=".opml,.xml,text/xml" disabled={busy} onchange={file('opml')} /></label>
