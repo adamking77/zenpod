@@ -65,6 +65,11 @@
   let shows = $state<Show[]>([]);
   let episodes = $state<Episode[]>([]);
   let list: HTMLElement;
+  // The pointer resting on an episode starts fetching it, so a click plays from memory. Once per episode.
+  const warmed = new Set<number>();
+  const warm = (id: number) => { if (id !== current && !warmed.has(id)) { warmed.add(id); invoke('warm', { id }); } };
+  // Just-added shows lead the list until you move on.
+  const following = $derived(ui.arrived ? [...shows].sort((a, b) => Number(ui.arrived!.ids.includes(b.id)) - Number(ui.arrived!.ids.includes(a.id))) : shows);
 
   async function load() {
     [newest, shows] = await Promise.all([api.newest(), api.shows()]);
@@ -96,7 +101,20 @@
     drill(null);
   }
 
+  // A show just added opens here, once the library has it.
+  $effect(() => {
+    const s = ui.reveal != null && shows.find((x) => x.id === ui.reveal);
+    if (s) { ui.reveal = null; ui.notes = false; drill(s).then(() => (added = s.id)); }
+  });
+  let added = $state<number | null>(null);
+  // A show chosen from the listening side opens here.
+  $effect(() => {
+    const s = ui.showing != null && shows.find((x) => x.id === ui.showing);
+    if (s) { ui.showing = null; ui.notes = false; ui.arrived = null; ui.tab = 'following'; drill(s); }
+  });
+
   async function drill(s: Show | null) {
+    added = null;
     confirming = false; fixNote = ''; feedFix = '';
     open = s;
     episodes = s ? await api.showEpisodes(s.id) : [];
@@ -128,7 +146,7 @@
 {/snippet}
 
 {#snippet row(e: Episode, withCover: boolean, meta: string)}
-  <button class="row" class:plain={!withCover} class:heard={e.played} class:playing={e.id === current} onclick={() => onplay(e)}>
+  <button class="row" class:plain={!withCover} class:heard={e.played} class:playing={e.id === current} onclick={() => onplay(e)} onpointerenter={() => warm(e.id)} onfocus={() => warm(e.id)}>
     {#if withCover}{@render cover(e.image_url, 34)}{/if}
     <span class="txt"><span class="t">{e.title}</span><span class="m"><span class="sub">{meta}</span> <span class="num">{length(e)}</span></span></span>
   </button>
@@ -137,13 +155,13 @@
 <section class="lib" aria-label="Library">
   <div class="lib-h">
     <span class="tabs" role="group" aria-label="Library">
-      <button aria-pressed={!ui.notes && ui.tab === 'new'} onclick={() => { ui.tab = 'new'; open = null; ui.notes = false; }}>New</button>
-      <button aria-pressed={!ui.notes && ui.tab === 'following'} onclick={() => { ui.tab = 'following'; open = null; ui.notes = false; }}>Following</button>
+      <button aria-pressed={!ui.notes && ui.tab === 'new'} onclick={() => { ui.tab = 'new'; open = null; ui.notes = false; ui.arrived = null; }}>New</button>
+      <button aria-pressed={!ui.notes && ui.tab === 'following'} onclick={() => { ui.tab = 'following'; open = null; ui.notes = false; ui.arrived = null; }}>Following</button>
     </span>
     <span class="modes">
       <button aria-label="Mini player" onclick={() => goTo('mini')}>{@html I.mini}</button>
       <button aria-label="Pill" onclick={() => goTo('pill')}>{@html I.pill}</button>
-      <button aria-label="Settings" aria-pressed={!ui.notes && ui.tab === 'settings'} onclick={() => { ui.tab = 'settings'; ui.notes = false; }}>
+      <button aria-label="Settings" aria-pressed={!ui.notes && ui.tab === 'settings'} onclick={() => { ui.tab = 'settings'; ui.notes = false; ui.arrived = null; }}>
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
       </button>
     </span>
@@ -189,6 +207,10 @@
       {/each}
     {:else if open}
       <button class="back" onclick={() => drill(null)}>← Following</button>
+      {#if added === open.id}
+        <p class="done-word">Now following</p>
+      {/if}
+      <span class="show-art">{@render cover(`listener://localhost/art/${open.id}`, 88)}</span>
       <h2 class="show-h">{open.title}</h2>
       {#if open.about}<p class="show-p">{plain(open.about)}</p>{/if}
       {#if open.spotify_only}
@@ -203,12 +225,20 @@
         <button class="leave" onclick={leave}>{confirming ? 'Press again to stop following' : 'Stop following'}</button>
       </div>
     {:else}
-      {#each shows as s (s.id)}
-        <button class="row show" onclick={() => drill(s)}>
+      {#if ui.arrived}
+        <div class="arrived" aria-live="polite">
+          <p>{ui.arrived.note}</p>
+          {#if ui.arrived.unreached.length}
+            <p class="sub">Couldn't reach {ui.arrived.unreached.length === 1 ? 'this one' : `these ${ui.arrived.unreached.length}`}: {ui.arrived.unreached.join(', ')}. Their feeds may be private or gone.</p>
+          {/if}
+        </div>
+      {/if}
+      {#each following as s (s.id)}
+        <button class="row show" class:arrive={ui.arrived?.ids.includes(s.id)} onclick={() => drill(s)}>
           {@render cover(s.image_url, 40)}
           <span class="txt"><span class="t">{s.title}</span>
             <span class="m sub">
-              {#if s.spotify_only}Only on Spotify{:else}{#if s.fresh}<span class="new">{s.fresh} new</span> · {/if}{s.author ?? ''}{/if}
+              {#if ui.arrived?.ids.includes(s.id)}<span class="new">Just added</span> · {/if}{#if s.spotify_only}Only on Spotify{:else}{#if s.fresh}<span class="new">{s.fresh} new</span> · {/if}{s.author ?? ''}{/if}
             </span></span>
         </button>
       {:else}
@@ -244,6 +274,8 @@
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .back { font-size: 12.5px; color: var(--text-dim); margin: 4px 0 18px; }
   .back:hover { color: var(--text); }
+  .show-art { display: block; margin: 4px 0 16px; }
+  .show-art :global(.cover) { border-radius: 9px; }
   .show-h { font-weight: 250; font-size: 24px; line-height: 1.2; margin: 0 0 8px; }
   .show-p { color: var(--text-dim); font-size: 13.5px; margin: 0 0 14px; max-width: 38ch; display: -webkit-box; -webkit-line-clamp: 5; line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
   .new { color: var(--accent); }
@@ -268,5 +300,19 @@
   .care input::placeholder { color: var(--text-faint); }
   .leave { font-size: 12.5px; color: var(--text-faint); }
   .leave:hover { color: var(--failed); }
+  /* 2050 motion: the summary is a quiet note, "Now following" a done word, new shows content arriving. Once per mount. */
+  .arrived { padding: 4px 0 14px; margin-bottom: 8px; border-bottom: 1px solid var(--hair);
+    transition: opacity var(--dur-pane) var(--ease-out), transform var(--dur-pane) var(--ease-out); }
+  .done-word { margin: 0 0 10px; font-size: 13px; color: var(--accent); transition: opacity var(--dur-pane) var(--ease-out), transform var(--dur-pane) var(--ease-out); }
+  .row.arrive { transition: opacity var(--dur-pane) var(--ease-out), transform var(--dur-pane) var(--ease-out); }
+  @starting-style {
+    .arrived { opacity: 0; transform: translateY(8px); }
+    .done-word, .row.arrive { opacity: 0; transform: translateY(4px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    @starting-style { .arrived, .done-word, .row.arrive { transform: none; } }
+  }
+  .arrived p { margin: 0; font-size: 14px; color: var(--text); }
+  .arrived .sub { margin-top: 6px; font-size: 13px; line-height: 1.45; }
   .quiet { color: var(--text-dim); font-size: 13.5px; max-width: 32ch; margin-top: 8px; }
 </style>

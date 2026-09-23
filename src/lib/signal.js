@@ -70,7 +70,8 @@ export function drawThread(V, c, w, h, center, progress, peaks, active, el){
   c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = 1; c.strokeStyle = INK; c.globalAlpha = .1*INKK;
   c.beginPath(); c.moveTo(0, center); c.lineTo(w, center); c.stroke();
   c.strokeStyle = SIGNAL; c.globalAlpha = .82; c.lineWidth = 1.25; c.beginPath(); c.moveTo(0, center); c.lineTo(datumX, center); c.stroke();
-  const start = Math.max(0, datumX-win), end = Math.min(w, datumX+win), n = Math.max(80, Math.min(180, Math.floor((end-start)/2.2)));
+  /* the packet stays centred on the dot; near either end it runs off the canvas rather than shifting ahead of or behind it */
+  const start = datumX-win, end = datumX+win, n = Math.max(80, Math.min(180, Math.floor((end-start)/2.2)));
   const att = v => Math.pow(4/(4+v*v), 4);
   const fam = [
     { color:SIGNAL, alpha:.8, lw:1.3, hh:1, comp:[[-1.55,2.65,1,1,0],[1.4,1.85,.78,-1,1.18],[.1,2.25,.58,1,2.38]] },

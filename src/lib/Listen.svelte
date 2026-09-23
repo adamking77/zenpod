@@ -34,10 +34,10 @@
   {#if now.episode}
     {@const e = now.episode}
     <div class="now">
-      <span class="cover"><img src="listener://localhost/art/{e.show_id}" alt="" /></span>
+      <button class="cover" aria-label="Open {e.show_title}" onclick={() => (ui.showing = e.show_id)}><img src="listener://localhost/art/{e.show_id}" alt="" /></button>
       <div class="who">
         <button class="title" aria-pressed={ui.notes} onclick={() => (ui.notes = !ui.notes)} title="Show notes">{e.title}</button>
-        <span class="sub">{e.show_title}{#if chapter?.title} · {chapter.title}{/if}</span>
+        <span class="sub"><button class="show" onclick={() => (ui.showing = e.show_id)}>{e.show_title}</button>{#if chapter?.title} · {chapter.title}{/if}</span>
       </div>
     </div>
     <div class="stage"><Signal {mode} /></div>
@@ -84,6 +84,8 @@
   .listen { container-type: inline-size; position: relative; padding: 64px 48px 44px; display: grid; grid-template-rows: auto 1fr auto; min-height: 0; min-width: 0; }
   .now { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 24px; align-items: center; min-width: 0; }
   .cover { display: block; aspect-ratio: 1; width: 100%; border-radius: 9px; overflow: hidden; background: var(--hair); }
+  .show { color: inherit; font: inherit; text-align: left; transition: color var(--dur-base) var(--ease-hover); }
+  @media (hover: hover) and (pointer: fine) { .show:hover { color: var(--text); } }
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .who { min-width: 0; }
   .title { width: 100%; text-align: left; max-width: 22ch; font-weight: 250; font-size: 28px; line-height: 1.18; letter-spacing: -0.012em; margin: 0 0 4px; text-wrap: balance;
