@@ -121,3 +121,30 @@ pub fn pill_panel(app: AppHandle, open: bool) -> R<()> {
     let _ = app.emit("panel", true);
     Ok(())
 }
+
+/// Carry a Mini or Pill (or the Pill by its panel) with the pointer from the press the page reports until the button comes up,
+/// once it has travelled a few points. The page can't do this itself: a panel that never activates
+/// the app gets no usable pointer moves. Answers whether it was a drag, so the page can drop the click.
+#[tauri::command]
+pub async fn drag_panel(app: AppHandle, window: WebviewWindow) -> R<bool> {
+    use tauri_nspanel::objc2_app_kit::NSEvent;
+    // The Pill's panel carries its Pill, and follows it like any other move.
+    let window = if window.label() == "panel" { app.get_webview_window("pill").ok_or("no pill")? } else { window };
+    let scale = window.scale_factor().map_err(err)?;
+    let at = window.outer_position().map_err(err)?.to_logical::<f64>(scale);
+    let from = NSEvent::mouseLocation();
+    let (mut dragged, mut last) = (false, (0.0, 0.0));
+    while NSEvent::pressedMouseButtons() & 1 == 1 {
+        let p = NSEvent::mouseLocation();
+        // Screen y runs upward in AppKit and downward in window positions.
+        let d = (p.x - from.x, from.y - p.y);
+        if d != last && (dragged || d.0.hypot(d.1) >= 4.0) {
+            dragged = true;
+            last = d;
+            window.set_position(LogicalPosition::new(at.x + d.0, at.y + d.1)).map_err(err)?;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(8)).await;
+    }
+    Ok(dragged)
+}
+

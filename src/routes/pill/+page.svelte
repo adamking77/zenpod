@@ -20,7 +20,7 @@
 <Surface me="pill" radius={24}>
   <div class="pill">
     <span class="po">
-      <Signal variant="pill" />
+      {#if !open}<Signal variant="pill" />{/if}
       {#if now.episode}<span class="disc"><img src="listener://localhost/art/{now.episode.show_id}" alt="" /></span>{/if}
     </span>
     <button class="who" data-drag aria-label="Open the pill panel" aria-expanded={open} onclick={() => invoke('pill_panel', { open: !open })}>

@@ -76,9 +76,12 @@
     if (!now.duration) return;
     const r = canvas.getBoundingClientRect();
     let f = (e.clientX - r.left - r.width * INSET) / (r.width * (1 - 2 * INSET));
-    if (variant === 'tether') f = (e.clientX - r.left) / r.width;
     if (variant === 'pill') return;
-    if (mode === 'orbit' || variant === 'mini') {
+    if (variant === 'tether') f = (e.clientX - r.left) / r.width;
+    else if (mode === 'orbit' || variant === 'mini') {
+      // The Mini's orb fills most of the Mini, so only the ring itself seeks; the rest is for carrying it.
+      const d = Math.min(r.width, r.height), dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+      if (variant === 'mini' && (dist < d * 0.14 || dist > d * 0.4)) return;
       let a = Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) + Math.PI / 2;
       if (a < 0) a += Math.PI * 2;
       f = a / (Math.PI * 2);

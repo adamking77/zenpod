@@ -4,7 +4,7 @@
   import { loadPrefs } from '$lib/prefs.svelte';
   import { arrivals, follow, keys, now } from '$lib/now.svelte';
   import { castFrom } from '$lib/cast';
-  import { dragWindow } from '$lib/drag';
+  import { dragPanel } from '$lib/drag';
 
   let { me, radius, drag = true, children }: { me: string; radius: number; drag?: boolean; children: Snippet } = $props();
 
@@ -17,7 +17,7 @@
 </script>
 
 <svelte:window onkeydown={keys} />
-<div class="surface" style:border-radius="{radius}px" use:dragWindow={drag}>{@render children()}</div>
+<div class="surface" style:border-radius="{radius}px" use:dragPanel={drag}>{@render children()}</div>
 
 <style>
   :global(html), :global(body) { background: transparent !important; }

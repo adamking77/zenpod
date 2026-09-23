@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
 
 // Controls keep their clicks; anything marked data-drag (the Pill's title) can also carry the window.
@@ -48,6 +49,41 @@ export function dragWindow(node: HTMLElement, enabled = true) {
       node.removeEventListener('pointermove', move);
       node.removeEventListener('pointerup', up);
       node.removeEventListener('pointercancel', up);
+      node.removeEventListener('click', click, true);
+    },
+  };
+}
+
+/**
+ * The Mini and Pill's version: they never activate the app, so the page gets no usable moves and
+ * the native side carries the panel instead. The click that ends a press waits for its answer and
+ * is replayed only if the panel didn't move, so a drag never seeks, plays or opens.
+ */
+export function dragPanel(node: HTMLElement, enabled = true) {
+  if (!enabled) return;
+  let pending: Promise<boolean> | null = null;
+  let replaying = false;
+  const down = (e: PointerEvent) => {
+    pending = null;
+    if (e.button !== 0 || (e.target as Element).closest(CONTROLS)) return;
+    pending = invoke<boolean>('drag_panel').catch(() => false);
+  };
+  const click = (e: MouseEvent) => {
+    if (replaying || !pending) return;
+    const drag = pending, target = e.target as Element;
+    pending = null;
+    e.stopPropagation(); e.preventDefault();
+    drag.then((dragged) => {
+      if (dragged) return;
+      replaying = true;
+      try { target.dispatchEvent(new MouseEvent('click', e)); } finally { replaying = false; }
+    });
+  };
+  node.addEventListener('pointerdown', down);
+  node.addEventListener('click', click, true);
+  return {
+    destroy() {
+      node.removeEventListener('pointerdown', down);
       node.removeEventListener('click', click, true);
     },
   };

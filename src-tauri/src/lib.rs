@@ -325,7 +325,7 @@ pub fn run() {
             log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
             play::playback, play::player_ready, play::choose, play::toggle, play::seek, play::skip,
             play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::transcript, play::keep,
-            modes::set_mode, modes::pill_panel
+            modes::set_mode, modes::pill_panel, modes::drag_panel
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
