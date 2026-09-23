@@ -18,7 +18,7 @@ const GAP: f64 = 10.0;
 
 fn build(app: &AppHandle, label: &str, (w, h): (f64, f64), radius: f64) -> tauri::Result<WebviewWindow> {
     let win = WebviewWindowBuilder::new(app, label, WebviewUrl::App(label.into()))
-        .title("Listener")
+        .title("Zenpod")
         .inner_size(w, h)
         .resizable(false)
         .decorations(false)

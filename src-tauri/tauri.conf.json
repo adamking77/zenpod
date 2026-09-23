@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Listener",
+  "productName": "Zenpod",
   "version": "0.1.0",
   "identifier": "me.adamking.listener",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Listener",
+        "title": "Zenpod",
         "width": 1080,
         "height": 700,
         "minWidth": 920,
