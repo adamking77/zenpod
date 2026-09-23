@@ -32,11 +32,14 @@ The Mini and the Pill float above other windows. They never take focus from the 
 
 - Follows shows by feed address or by name, and checks them hourly.
 - Imports your shows from an OPML file (Overcast, Pocket Casts and most other apps) or from your Spotify data export.
+- Opens an episode's notes beside the player, with links you can follow.
 - Shows chapters and transcripts when the feed has them.
 - Keeps episodes for offline listening.
 - Day, Night or follow the system, with fourteen accent colours. The window light can take its colour from the show's artwork.
 
-![Following](docs/screenshots/following.png)
+| Following | An episode's notes |
+| --- | --- |
+| ![Following](docs/screenshots/following.png) | ![An episode's notes](docs/screenshots/episode.png) |
 
 ## Build
 
