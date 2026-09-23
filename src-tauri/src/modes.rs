@@ -1,4 +1,4 @@
-//! The Mini and the Pill: floating panels that never take focus from the app you're in,
+//! The Mini and the Pill: normal-level panels that never take focus from the app you're in,
 //! on the desktop's frosted material. The main window, Mini and Pill show one at a time.
 
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -8,7 +8,7 @@ use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectStat
 use crate::{err, store, Core, R};
 
 tauri_panel! {
-    panel!(Floating { config: { can_become_key_window: true, is_floating_panel: true } })
+    panel!(Floating { config: { can_become_key_window: true, is_floating_panel: false } })
 }
 
 pub const MINI: (f64, f64) = (280.0, 404.0);
@@ -30,7 +30,7 @@ fn build(app: &AppHandle, label: &str, (w, h): (f64, f64), radius: f64) -> tauri
         .build()?;
     let _ = apply_vibrancy(&win, NSVisualEffectMaterial::Popover, Some(NSVisualEffectState::Active), Some(radius));
     let panel = win.to_panel::<Floating>().map_err(|e| tauri::Error::Io(anyhow_like(e)))?;
-    panel.set_level(PanelLevel::Floating.value());
+    panel.set_level(PanelLevel::Normal.value());
     // Joining the app never activates it: the mask alone isn't enough on macOS 27 (tauri-nspanel#123),
     // the private flag re-syncs the window server's activation tag. Verified in M0.
     let _ = panel.add_style_mask(StyleMask::empty().nonactivating_panel().into());
