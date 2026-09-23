@@ -216,13 +216,14 @@
       {#if open.spotify_only}
         <p class="show-p">No public feed was found for this show, so it can't be played here. If it has one, paste its address below.</p>
       {/if}
+      <!-- Up here, not after the episodes: some shows have hundreds. -->
+      <button class="leave" onclick={leave}>{confirming ? 'Press again to stop following' : 'Stop following'}</button>
       {#each episodes as e (e.id)}{@render row(e, false, `${date(e.published)} ·`)}{/each}
       <div class="care">
         <form onsubmit={fix}>
           <input bind:value={feedFix} placeholder={open.spotify_only ? 'Its feed address' : 'Wrong show? Paste the right feed address'} aria-label="Feed address for this show" />
         </form>
         {#if fixNote}<p class="quiet">{fixNote}</p>{/if}
-        <button class="leave" onclick={leave}>{confirming ? 'Press again to stop following' : 'Stop following'}</button>
       </div>
     {:else}
       {#if ui.arrived}
@@ -298,7 +299,7 @@
   .care input { font: inherit; font-size: 13.5px; color: var(--text); background: none; border: 0; border-bottom: 1px solid var(--line); padding: 4px 0 6px; outline: none; width: 100%; }
   .care input:focus { border-bottom-color: var(--accent); }
   .care input::placeholder { color: var(--text-faint); }
-  .leave { font-size: 12.5px; color: var(--text-faint); }
+  .leave { display: block; font-size: 12.5px; color: var(--text-faint); margin: 0 0 16px; }
   .leave:hover { color: var(--failed); }
   /* 2050 motion: the summary is a quiet note, "Now following" a done word, new shows content arriving. Once per mount. */
   .arrived { padding: 4px 0 14px; margin-bottom: 8px; border-bottom: 1px solid var(--hair);
