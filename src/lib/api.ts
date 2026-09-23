@@ -11,13 +11,14 @@ export type Episode = {
   played: boolean; kept: boolean; offline: boolean; image_url: string | null;
 };
 
-export type Imported = { added: number; had: number; spotify_only: number; failed: number };
+export type Imported = { added: number; had: number; spotify_only: number; failed: number; ids: number[]; unreached: string[] };
 
 export const api = {
-  addShow: (input: string) => invoke<string>('add_show', { input }),
+  addShow: (input: string) => invoke<[number, string]>('add_show', { input }),
   refresh: () => invoke<number>('refresh'),
   importOpml: (text: string) => invoke<Imported>('import_opml', { text }),
   importSpotify: (text: string) => invoke<Imported>('import_spotify', { text }),
+  importApple: () => invoke<Imported>('import_apple'),
   shows: () => invoke<Show[]>('shows'),
   newest: () => invoke<Episode[]>('newest'),
   showEpisodes: (showId: number) => invoke<Episode[]>('show_episodes', { showId }),

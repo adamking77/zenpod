@@ -21,22 +21,6 @@ pub struct Core {
     urls: Mutex<HashMap<i64, String>>,
 }
 
-/// Follow an enclosure's redirect chain once per session; range requests then go straight to the host.
-pub async fn resolved_url(app: &AppHandle, id: i64, remote: &str) -> String {
-    if let Some(u) = app.state::<Core>().urls.lock().unwrap().get(&id).cloned() {
-        return u;
-    }
-    let u = feed::HTTP
-        .get(remote)
-        .header("range", "bytes=0-0")
-        .send()
-        .await
-        .map(|r| r.url().to_string())
-        .unwrap_or_else(|_| remote.to_string());
-    app.state::<Core>().urls.lock().unwrap().insert(id, u.clone());
-    u
-}
-
 type R<T> = Result<T, String>;
 
 fn err(e: impl std::fmt::Display) -> String {
@@ -87,18 +71,22 @@ where
 }
 
 #[tauri::command]
-async fn add_show(app: AppHandle, input: String) -> R<String> {
+async fn add_show(app: AppHandle, input: String) -> R<(i64, String)> {
     let input = input.trim();
-    let url = if input.starts_with("http://") || input.starts_with("https://") {
+    let url = if let Some(id) = feed::apple_id(input) {
+        feed::lookup_feed(id)
+            .await
+            .ok_or("Apple doesn't share a public feed for that show.")?
+    } else if input.starts_with("http://") || input.starts_with("https://") {
         input.to_string()
     } else {
         feed::find_feed(input, "")
             .await
             .ok_or_else(|| format!("No public feed was found for “{input}”."))?
     };
-    let (_, title) = ingest(&app, &url).await?;
+    let added = ingest(&app, &url).await?;
     library_changed(&app);
-    Ok(title)
+    Ok(added)
 }
 
 #[tauri::command]
@@ -123,27 +111,48 @@ struct Imported {
     had: usize,
     spotify_only: usize,
     failed: usize,
+    /// The shows just added, so Following can point them out.
+    ids: Vec<i64>,
+    /// Names (or addresses) of the shows that couldn't be reached.
+    unreached: Vec<String>,
 }
 
 #[tauri::command]
 async fn import_opml(app: AppHandle, text: String) -> R<Imported> {
-    let urls = feed::opml_feeds(&text)?;
+    import_feeds(&app, feed::opml_feeds(&text)?).await
+}
+
+/// Everything the Apple Podcasts app follows on this Mac.
+#[tauri::command]
+async fn import_apple(app: AppHandle) -> R<Imported> {
+    let scratch = app.path().app_cache_dir().map_err(err)?;
+    let feeds = tauri::async_runtime::spawn_blocking(move || feed::apple_library(&scratch)).await.map_err(err)??;
+    if feeds.is_empty() {
+        return Err("Apple Podcasts isn't following any shows on this Mac.".into());
+    }
+    import_feeds(&app, feeds).await
+}
+
+/// Follow each feed not already followed. Each comes with the show's name when the source knows it.
+async fn import_feeds(app: &AppHandle, feeds: Vec<(String, Option<String>)>) -> R<Imported> {
     let core = app.state::<Core>();
     let known: Vec<String> = store::feeds(&core.db.lock().unwrap())
         .map_err(err)?
         .into_iter()
         .map(|f| f.1)
         .collect();
-    let (had, new): (Vec<_>, Vec<_>) = urls.into_iter().partition(|u| known.contains(u));
+    let (had, new): (Vec<_>, Vec<_>) = feeds.into_iter().partition(|(u, _)| known.contains(u));
     let a = app.clone();
-    let res = bounded(new, 6, move |u| {
+    let res = bounded(new, 6, move |(u, name): (String, Option<String>)| {
         let a = a.clone();
-        async move { ingest(&a, &u).await.is_ok() }
+        async move { ingest(&a, &u).await.map(|(id, _)| id).map_err(|_| name.unwrap_or(u)) }
     })
     .await;
-    library_changed(&app);
-    let added = res.iter().filter(|ok| **ok).count();
-    Ok(Imported { added, had: had.len(), spotify_only: 0, failed: res.len() - added })
+    library_changed(app);
+    let (ids, unreached): (Vec<_>, Vec<_>) = res.into_iter().partition(Result::is_ok);
+    let ids: Vec<i64> = ids.into_iter().flatten().collect();
+    let unreached: Vec<String> = unreached.into_iter().filter_map(Result::err).collect();
+    Ok(Imported { added: ids.len(), had: had.len(), spotify_only: 0, failed: unreached.len(), ids, unreached })
 }
 
 #[tauri::command]
@@ -160,18 +169,21 @@ async fn import_spotify(app: AppHandle, text: String) -> R<Imported> {
         let a = a.clone();
         async move {
             match feed::find_feed(&name, &publisher).await {
-                Some(url) => ingest(&a, &url).await.map(|_| true).map_err(|_| (name, publisher)),
+                Some(url) => ingest(&a, &url).await.map(|(id, _)| id).map_err(|_| (name, publisher)),
                 None => Err((name, publisher)),
             }
         }
     })
     .await;
-    let mut imp = Imported { added: 0, had: had.len(), spotify_only: 0, failed: 0 };
+    let mut imp = Imported { added: 0, had: had.len(), spotify_only: 0, failed: 0, ids: vec![], unreached: vec![] };
     {
         let db = core.db.lock().unwrap();
         for r in res {
             match r {
-                Ok(_) => imp.added += 1,
+                Ok(id) => {
+                    imp.added += 1;
+                    imp.ids.push(id);
+                }
                 Err((n, p)) => {
                     store::add_spotify_only(&db, &n, &p).map_err(err)?;
                     imp.spotify_only += 1;
@@ -322,10 +334,10 @@ pub fn run() {
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
-            log, add_show, refresh, import_opml, import_spotify, shows, newest, show_episodes, settings, set_setting,
+            log, add_show, refresh, import_opml, import_spotify, import_apple, shows, newest, show_episodes, settings, set_setting,
             play::playback, play::player_ready, play::choose, play::toggle, play::seek, play::skip,
             play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::transcript, play::keep,
-            modes::set_mode, modes::pill_panel, modes::drag_panel
+            modes::set_mode, modes::pill_panel, modes::drag_panel, proto::warm
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

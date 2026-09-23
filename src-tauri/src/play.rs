@@ -97,22 +97,28 @@ pub fn player_ready(app: AppHandle, core: State<Core>) {
     }
 }
 
-/// Choosing an episode loads it, paused, at its saved position. Play starts it.
+/// Choosing an episode plays it from its saved position; choosing the one already loaded resumes it.
+/// If the player can't start, it reports back and the state returns to paused.
 #[tauri::command]
 pub fn choose(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
     let db = core.db.lock().unwrap();
     let mut now = core.now.lock().unwrap();
     if now.episode.as_ref().is_some_and(|e| e.id == id) {
+        if !now.playing {
+            now.playing = true;
+            send(&app, Cmd::Play);
+            broadcast(&app, &now);
+        }
         return Ok(());
     }
     persist(&db, &mut now);
     let e = store::episode(&db, id).map_err(err)?.ok_or("That episode is gone.")?;
     now.position = if e.played { 0.0 } else { e.position };
     now.duration = e.duration.unwrap_or(0.0);
-    now.playing = false;
+    now.playing = true;
     now.episode = Some(e);
     store::set_setting(&db, "current", &id.to_string()).map_err(err)?;
-    if let Some(cmd) = load_cmd(&now, false) {
+    if let Some(cmd) = load_cmd(&now, true) {
         send(&app, cmd);
     }
     broadcast(&app, &now);

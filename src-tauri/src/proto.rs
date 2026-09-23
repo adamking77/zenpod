@@ -106,10 +106,13 @@ async fn audio(app: &AppHandle, id: i64, range: Option<String>) -> Result<Res, S
     Ok(partial(block[off..=off + last].to_vec(), start, total, &ctype))
 }
 
-const BLOCK: u64 = 1024 * 1024;
+// Small enough that the first one arrives quickly (about 1s from a typical CDN), large enough to keep ahead of playback.
+const BLOCK: u64 = 256 * 1024;
 type Block = (std::sync::Arc<Vec<u8>>, u64, String);
+type Cell = std::sync::Arc<tokio::sync::OnceCell<Block>>;
 
-static BLOCKS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<(i64, u64), Block>>> =
+// One cell per block, so a warm-up and the player asking for the same block share a single request.
+static BLOCKS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<(i64, u64), Cell>>> =
     std::sync::LazyLock::new(Default::default);
 
 async fn remote_total(app: &AppHandle, id: i64, remote: &str) -> Option<u64> {
@@ -117,16 +120,30 @@ async fn remote_total(app: &AppHandle, id: i64, remote: &str) -> Option<u64> {
 }
 
 async fn fetch_block(app: &AppHandle, id: i64, remote: &str, n: u64) -> Result<Block, StatusCode> {
-    if let Some(b) = BLOCKS.lock().unwrap().get(&(id, n)) {
-        return Ok(b.clone());
+    let cell = {
+        let mut cache = BLOCKS.lock().unwrap();
+        if cache.len() >= 96 {
+            cache.clear(); // ponytail: drop-all eviction, 24 MB ceiling; LRU if seeking ever thrashes
+        }
+        cache.entry((id, n)).or_default().clone()
+    };
+    let got = cell.get_or_try_init(|| fetch_remote(app, id, remote, n)).await.cloned();
+    if got.is_err() {
+        BLOCKS.lock().unwrap().remove(&(id, n)); // a failure isn't remembered; the next ask tries again
     }
-    let url = crate::resolved_url(app, id, remote).await;
+    got
+}
+
+async fn fetch_remote(app: &AppHandle, id: i64, remote: &str, n: u64) -> Result<Block, StatusCode> {
+    // The feed's address usually redirects through a tracker or two; after the first block, go straight to the file.
+    let known = app.state::<Core>().urls.lock().unwrap().get(&id).cloned();
     let r = HTTP
-        .get(&url)
+        .get(known.as_deref().unwrap_or(remote))
         .header(header::RANGE, format!("bytes={}-{}", n * BLOCK, (n + 1) * BLOCK - 1))
         .send()
         .await
         .map_err(|_| StatusCode::BAD_GATEWAY)?;
+    app.state::<Core>().urls.lock().unwrap().insert(id, r.url().to_string());
     let ctype = r.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("audio/mpeg").to_string();
     let total = r
         .headers()
@@ -145,13 +162,27 @@ async fn fetch_block(app: &AppHandle, id: i64, remote: &str, n: u64) -> Result<B
             (body[a..((n + 1) * BLOCK).min(t) as usize].to_vec(), t)
         }
     };
-    let b = (std::sync::Arc::new(body), total, ctype);
-    let mut cache = BLOCKS.lock().unwrap();
-    if cache.len() >= 24 {
-        cache.clear(); // ponytail: drop-all eviction, 24 MB ceiling; LRU if seeking ever thrashes
+    Ok((std::sync::Arc::new(body), total, ctype))
+}
+
+/// Start fetching an episode before it's chosen (the pointer is on it): its first block, then the block
+/// at its saved place, so choosing it starts from memory. Downloaded episodes need nothing.
+#[tauri::command]
+pub async fn warm(app: AppHandle, id: i64) {
+    let Some((remote, place)) = ({
+        let core = app.state::<Core>();
+        let db = core.db.lock().unwrap();
+        let src = store::audio_source(&db, id).ok();
+        let e = store::episode(&db, id).ok().flatten();
+        src.filter(|(local, _)| local.as_ref().is_none_or(|p| !std::path::Path::new(p).exists()))
+            .map(|(_, remote)| (remote, e.filter(|e| !e.played && e.position > 0.0).and_then(|e| Some(e.position / e.duration?))))
+    }) else {
+        return;
+    };
+    let Ok((_, total, _)) = fetch_block(&app, id, &remote, 0).await else { return };
+    if let Some(f) = place.filter(|f| *f < 1.0) {
+        let _ = fetch_block(&app, id, &remote, (total as f64 * f) as u64 / BLOCK).await;
     }
-    cache.insert((id, n), b.clone());
-    Ok(b)
 }
 
 fn sniff(b: &[u8]) -> &'static str {

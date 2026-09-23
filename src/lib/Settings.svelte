@@ -9,12 +9,15 @@
   let note = $state('');
   let busy = $state(false);
 
+  // Say what arrived, then show it: Following leads with the new shows.
   const said = (i: Imported) => {
-    const parts = [`${i.added} ${i.added === 1 ? 'show is' : 'shows are'} in Following`];
+    const parts = [i.added ? `${i.added} new ${i.added === 1 ? 'show' : 'shows'}` : 'No new shows'];
     if (i.had) parts.push(`${i.had} you already had`);
     if (i.spotify_only) parts.push(`${i.spotify_only} only on Spotify`);
-    if (i.failed) parts.push(`${i.failed} couldn't be reached`);
-    return parts.join(', ') + '.';
+    const note = parts.join(', ') + '.';
+    ui.arrived = { note, ids: i.ids, unreached: i.unreached };
+    ui.tab = 'following';
+    return note;
   };
 
   async function run(task: () => Promise<string>) {
@@ -27,7 +30,7 @@
     ev.preventDefault();
     const v = address.trim();
     if (!v) return;
-    run(async () => { const t = await api.addShow(v); address = ''; return `${t} is in Following.`; });
+    run(async () => { const [id, t] = await api.addShow(v); address = ''; ui.reveal = id; ui.tab = 'following'; return `${t} is in Following.`; });
   }
 
   function file(kind: 'opml' | 'spotify') {
@@ -70,8 +73,9 @@
     <div class="lbl">Bring your shows</div>
     <div class="imp">
       <form onsubmit={add}>
-        <input bind:this={field} bind:value={address} disabled={busy} placeholder="A feed address, or a show's name" aria-label="A feed address, or a show's name" />
+        <input bind:this={field} bind:value={address} disabled={busy} placeholder="A feed address, a show's name or an Apple Podcasts link" aria-label="A feed address, a show's name or an Apple Podcasts link" />
       </form>
+      <button class="from" disabled={busy} onclick={() => run(async () => said(await api.importApple()))}><span>From Apple Podcasts</span><span class="sub">The shows you follow in Apple's app on this Mac</span></button>
       <label><span>From a list of shows</span><span class="sub">An OPML file, from Overcast, Pocket Casts or most other podcast apps</span>
         <input type="file" accept=".opml,.xml,text/xml" disabled={busy} onchange={file('opml')} /></label>
       <label><span>From your Spotify data</span><span class="sub">YourLibrary.json, from Spotify's privacy page</span>
@@ -96,8 +100,9 @@
   .words button:hover { color: var(--text-dim); }
   .words button[aria-pressed="true"] { color: var(--text); }
   .imp { display: grid; gap: 12px; }
-  .imp label { font-size: 14px; color: var(--text); cursor: pointer; display: grid; gap: 1px; position: relative; }
-  .imp label:hover span:first-child, .imp label:focus-within span:first-child { color: var(--accent); }
+  .imp label, .imp .from { font-size: 14px; color: var(--text); cursor: pointer; display: grid; gap: 1px; position: relative; }
+  .imp label:hover span:first-child, .imp label:focus-within span:first-child, .imp .from:hover span:first-child, .imp .from:focus-visible span:first-child { color: var(--accent); }
+  .imp .from { text-align: left; }
   .imp input[type="file"] { position: absolute; opacity: 0; width: 1px; height: 1px; }
   .imp input:not([type]) { font: inherit; font-size: 14px; color: var(--text); background: none; border: 0; border-bottom: 1px solid var(--line); padding: 4px 0 6px; outline: none; width: 100%; }
   .imp input:not([type]):focus { border-bottom-color: var(--accent); }
