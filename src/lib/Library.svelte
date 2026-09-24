@@ -10,6 +10,7 @@
   import { I } from '$lib/icons';
   import { fmt } from '$lib/api';
   import { ui } from '$lib/ui.svelte';
+  import { prefs, setPref } from '$lib/prefs.svelte';
 
   // Show notes as paragraphs of text and links; the feed's HTML is read for nothing else.
   type Bit = { text: string; href?: string };
@@ -58,7 +59,7 @@
     list?.querySelector('.cue.now')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   });
 
-  let { current = null, onplay }: { current?: number | null; onplay: (e: Episode) => void } = $props();
+  let { current = null, onplay }: { current?: number | null; onplay: (e: Episode, list: Episode[]) => void } = $props();
 
   let open = $state<Show | null>(null);
   let newest = $state<Episode[]>([]);
@@ -68,8 +69,18 @@
   // The pointer resting on an episode starts fetching it, so a click plays from memory. Once per episode.
   const warmed = new Set<number>();
   const warm = (id: number) => { if (id !== current && !warmed.has(id)) { warmed.add(id); invoke('warm', { id }); } };
-  // Just-added shows lead the list until you move on.
-  const following = $derived(ui.arrived ? [...shows].sort((a, b) => Number(ui.arrived!.ids.includes(b.id)) - Number(ui.arrived!.ids.includes(a.id))) : shows);
+  // Following's order: by name (as the core sends it), latest episode, or most new. Spotify-only shows stay last,
+  // and just-added shows lead the list until you move on.
+  const SORTS = [['name', 'Name'], ['latest', 'Latest'], ['new', 'New']] as const;
+  const by: Record<string, (a: Show, b: Show) => number> = {
+    latest: (a, b) => (b.latest ?? 0) - (a.latest ?? 0),
+    new: (a, b) => b.fresh - a.fresh || (b.latest ?? 0) - (a.latest ?? 0),
+  };
+  const following = $derived.by(() => {
+    const order = by[prefs.sort];
+    const arrived = (s: Show) => Number(ui.arrived?.ids.includes(s.id) ?? false);
+    return [...shows].sort((a, b) => arrived(b) - arrived(a) || Number(a.spotify_only) - Number(b.spotify_only) || (order?.(a, b) ?? 0));
+  });
 
   async function load() {
     [newest, shows] = await Promise.all([api.newest(), api.shows()]);
@@ -145,8 +156,8 @@
   </span>
 {/snippet}
 
-{#snippet row(e: Episode, withCover: boolean, meta: string)}
-  <button class="row" class:plain={!withCover} class:heard={e.played} class:playing={e.id === current} onclick={() => onplay(e)} onpointerenter={() => warm(e.id)} onfocus={() => warm(e.id)}>
+{#snippet row(e: Episode, list: Episode[], withCover: boolean, meta: string)}
+  <button class="row" class:plain={!withCover} class:heard={e.played} class:playing={e.id === current} onclick={() => onplay(e, list)} onpointerenter={() => warm(e.id)} onfocus={() => warm(e.id)}>
     {#if withCover}{@render cover(e.image_url, 34)}{/if}
     <span class="txt"><span class="t">{e.title}</span><span class="m"><span class="sub">{meta}</span> <span class="num">{length(e)}</span></span></span>
   </button>
@@ -201,7 +212,7 @@
     {:else if ui.tab === 'new'}
       {#each grouped as g (g.label)}
         <div class="day">{g.label}</div>
-        {#each g.eps as e (e.id)}{@render row(e, true, `${short(e.show_title)} ·`)}{/each}
+        {#each g.eps as e (e.id)}{@render row(e, newest, true, `${short(e.show_title)} ·`)}{/each}
       {:else}
         <p class="quiet">Nothing new yet. Bring your shows in from Settings.</p>
       {/each}
@@ -218,7 +229,7 @@
       {/if}
       <!-- Up here, not after the episodes: some shows have hundreds. -->
       <button class="leave" onclick={leave}>{confirming ? 'Press again to stop following' : 'Stop following'}</button>
-      {#each episodes as e (e.id)}{@render row(e, false, `${date(e.published)} ·`)}{/each}
+      {#each episodes as e (e.id)}{@render row(e, episodes, false, `${date(e.published)} ·`)}{/each}
       <div class="care">
         <form onsubmit={fix}>
           <input bind:value={feedFix} placeholder={open.spotify_only ? 'Its feed address' : 'Wrong show? Paste the right feed address'} aria-label="Feed address for this show" />
@@ -233,6 +244,11 @@
             <p class="sub">Couldn't reach {ui.arrived.unreached.length === 1 ? 'this one' : `these ${ui.arrived.unreached.length}`}: {ui.arrived.unreached.join(', ')}. Their feeds may be private or gone.</p>
           {/if}
         </div>
+      {/if}
+      {#if shows.length > 1}
+        <span class="reading sort" role="group" aria-label="Sort shows by">
+          {#each SORTS as [k, label]}<button aria-pressed={(prefs.sort || 'name') === k} onclick={() => setPref('sort', k)}>{label}</button>{/each}
+        </span>
       {/if}
       {#each following as s (s.id)}
         <button class="row show" class:arrive={ui.arrived?.ids.includes(s.id)} onclick={() => drill(s)}>
@@ -288,6 +304,7 @@
   .reading { display: flex; gap: 16px; margin: 0 0 14px; }
   .reading button { font-size: 13px; color: var(--text-faint); transition: color 0.14s ease; }
   .reading button[aria-pressed="true"] { color: var(--text); }
+  .sort { margin: 2px 0 6px; }
   .note a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
   .note a:hover { text-decoration: underline; }
   .cue { display: inline; text-align: left; font: inherit; color: inherit; transition: color 0.2s var(--ease); }
