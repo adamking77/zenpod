@@ -2,7 +2,7 @@
 
 Version 0.3.0. This file describes the app as it ships, not as the mockups imagined it. The code is the source of truth: `src/lib/tokens.css` (flavors and roles), `src/lib/app.css` (Zenpod's layer on top), and each component's `<style>`. `design/tokens.json` mirrors them for tools. `design/guide.html` shows all of it rendered.
 
-Brand, voice and the mark live in [BRAND.md](BRAND.md).
+Brand, voice, the mark and the wordmark (ZENPOD in Lexend Giga ExtraLight) live in [BRAND.md](BRAND.md).
 
 ## Principles
 
@@ -65,6 +65,8 @@ Two faces, both bundled with the app through Fontsource:
 
 - **Hanken Grotesk Variable** for everything you read. Light weights (250–300) for anything 16px or larger.
 - **Fragment Mono** for numbers, with tabular figures.
+
+The wordmark's face, Lexend Giga, is brand only. The app doesn't bundle it, and no interface text uses it.
 
 | Token | Weight / size / leading | Use |
 | --- | --- | --- |
