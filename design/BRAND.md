@@ -12,7 +12,7 @@ Zenpod is quiet, exact and unhurried. It doesn't try to keep you in the app. It 
 
 ## The name
 
-- Write it **Zenpod**: one word, capital Z. Never ZenPod, Zen Pod or ZENPOD in running text.
+- Write it **Zenpod**: one word, capital Z. Never ZenPod or Zen Pod. Capitals are for the wordmark only; in running text it's always Zenpod.
 - Internally the app is still called `listener`: the folders, the crate, the `listener://` scheme and the bundle id `me.adamking.listener`. That's deliberate, because changing the bundle id would move the library. None of it should ever appear in front of a user.
 
 ## The mark
@@ -41,13 +41,32 @@ The source is `src-tauri/icons/Zenpod.icon` (Icon Composer, two layers: `accent`
 
 ## The wordmark
 
-The app has no custom logotype yet. `guide.html` sets six calm, futuristic candidates beside the mark so they can be compared. The recommendation there is a proposal, not a decision, until Adam chooses one.
+**ZENPOD**, set in **Lexend Giga ExtraLight** (200), all capitals, tracked at **0.28em**.
 
-Whichever is chosen:
+Lexend Giga is already wide. Light capitals with open spacing give it a calm, instrument-like feel, like the label on a piece of good hi-fi. It's futuristic without being loud.
 
-- Lowercase `zenpod` or sentence case `Zenpod`, set light (200–300) with open tracking. Never bold and never in capitals.
-- Set it in ink, never in the accent. The accent belongs to the mark's played third.
-- The wordmark is only for the brand: the README, the website, the DMG window and the About panel. Inside the app, the interface stays in Hanken Grotesk.
+| Property | Value |
+| --- | --- |
+| Face | Lexend Giga (Google Fonts, SIL Open Font License) |
+| Weight | 200, ExtraLight |
+| Case | All capitals: `ZENPOD` (type it as capitals, not with `text-transform`, so it copies correctly) |
+| Tracking | 0.28em. Take 0.28em off the right edge (`margin-right: -0.28em`) so it centres optically |
+| Colour | Ink: `#3f3f48` on Day, `#dfe4f0` on Night. Never the accent |
+| Smallest size | 14px. Below that, the thin strokes break up. Use the mark alone instead |
+
+**Lockups**
+
+- **Horizontal:** the mark, then the wordmark, with a gap of half the mark's height. The cap height is about 40% of the mark's height, and they're centred vertically.
+- **Stacked:** the wordmark centred under the mark, a quarter of the mark's height below it, set at about 60% of the mark's width.
+- **Wordmark alone:** fine where the icon is already on screen, such as the DMG window or the About panel.
+
+**Don't**
+
+- Set it in lowercase, bold, a heavier weight or a different face.
+- Tighten the tracking, or add an outline, shadow, gradient or the accent.
+- Put it inside the icon tile.
+
+**Where it's used:** the README header, the website, the DMG window and the About panel. Inside the app, the interface stays in Hanken Grotesk, and the app doesn't use the wordmark at all.
 
 ## Colour
 
@@ -66,7 +85,7 @@ The other thirteen accents belong to the person, not the brand. Use Blue in any 
 
 - **Hanken Grotesk** for everything: light weights for large text, regular for body.
 - **Fragment Mono** for numbers and times only.
-- For the wordmark, see above.
+- **Lexend Giga ExtraLight** for the wordmark only. See above.
 
 ## Voice
 
