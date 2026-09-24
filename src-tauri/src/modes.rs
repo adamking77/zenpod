@@ -75,6 +75,15 @@ fn hide_panel(app: &AppHandle, label: &str) {
     }
 }
 
+/// Bring the Mini or Pill forward if one is showing. Returns whether one was.
+pub fn raise(app: &AppHandle) -> bool {
+    let showing = ["mini", "pill"].into_iter().find(|l| app.get_webview_window(l).and_then(|w| w.is_visible().ok()).unwrap_or(false));
+    if let Some(l) = showing {
+        show_panel(app, l);
+    }
+    showing.is_some()
+}
+
 /// Switch between the window, the Mini and the Pill.
 #[tauri::command]
 pub fn set_mode(app: AppHandle, to: String) -> R<()> {

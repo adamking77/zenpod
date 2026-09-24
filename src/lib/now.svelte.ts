@@ -2,10 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { Episode } from '$lib/api';
 
-export type Now = { episode: Episode | null; playing: boolean; position: number; duration: number; speed: number };
+export type Now = { episode: Episode | null; playing: boolean; position: number; duration: number; speed: number; prev: boolean; next: boolean };
 
 // What the core says is playing, plus when we heard it, so the time can run smoothly between reports.
-export const now = $state<Now & { at: number }>({ episode: null, playing: false, position: 0, duration: 0, speed: 1, at: 0 });
+export const now = $state<Now & { at: number }>({ episode: null, playing: false, position: 0, duration: 0, speed: 1, prev: false, next: false, at: 0 });
 
 const take = (n: Now) => Object.assign(now, n, { at: performance.now() });
 
@@ -18,7 +18,9 @@ export const position = () =>
   now.playing ? Math.min(now.duration || Infinity, now.position + ((performance.now() - now.at) / 1000) * now.speed) : now.position;
 
 export const player = {
-  choose: (id: number) => invoke('choose', { id }),
+  /** `queue` is the list it was chosen from, in order; previous, next and autoplay walk it. */
+  choose: (id: number, queue?: number[]) => invoke('choose', { id, queue }),
+  step: (by: -1 | 1) => invoke('step', { by }),
   toggle: () => invoke('toggle'),
   seek: (position: number) => invoke('seek', { position }),
   skip: (by: number) => invoke('skip', { by }),

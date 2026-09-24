@@ -34,7 +34,7 @@
     <div class="edge" role="separator" aria-orientation="vertical" aria-label="Library width" data-no-drag onpointerdown={resize}
       ondblclick={() => setPref('libw', '400')}></div>
     <Listen />
-    <Library current={now.episode?.id ?? null} onplay={(e) => player.choose(e.id)} />
+    <Library current={now.episode?.id ?? null} onplay={(e, list) => player.choose(e.id, list.map((x) => x.id))} />
   </div>
 </main>
 

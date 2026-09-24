@@ -6,7 +6,7 @@ import { api } from '$lib/api';
 export const ACCENTS = ['Rosewater', 'Flamingo', 'Pink', 'Mauve', 'Red', 'Maroon', 'Peach', 'Yellow',
   'Green', 'Teal', 'Sky', 'Sapphire', 'Blue', 'Lavender'] as const;
 
-export const prefs = $state<Record<string, string>>({ look: '', light: 'cast', accent: 'Blue', viz: 'field' });
+export const prefs = $state<Record<string, string>>({ look: '', light: 'cast', accent: 'Blue', viz: 'field', sort: 'name', autoplay: 'on' });
 
 const root = document.documentElement;
 const dark = matchMedia('(prefers-color-scheme: dark)');

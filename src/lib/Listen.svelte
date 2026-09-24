@@ -6,6 +6,7 @@
   import { ui } from '$lib/ui.svelte';
   import Signal from '$lib/Signal.svelte';
   import { castFrom } from '$lib/cast';
+  import { I } from '$lib/icons';
 
   const MODES = ['field', 'thread', 'orbit'] as const;
   type Mode = (typeof MODES)[number];
@@ -49,6 +50,7 @@
         </span>
       </span>
       <span class="ctl">
+        <button class="ico step" aria-label="Previous episode" disabled={!now.prev} onclick={() => player.step(-1)}>{@html I.prev}</button>
         <button class="ico" aria-label="Back 15 seconds" onclick={() => player.skip(-15)}><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M4.6 8.4A6 6 0 1 1 4 12"/><path d="M4 4.6v3.9h3.9"/></svg></button>
         <button class="play" aria-label={now.playing ? 'Pause' : 'Play'} onclick={player.toggle}>
           {#if now.playing}
@@ -58,6 +60,7 @@
           {/if}
         </button>
         <button class="ico" aria-label="Forward 30 seconds" onclick={() => player.skip(30)}><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M15.4 8.4A6 6 0 1 0 16 12"/><path d="M16 4.6v3.9h-3.9"/></svg></button>
+        <button class="ico step" aria-label="Next episode" disabled={!now.next} onclick={() => player.step(1)}>{@html I.next}</button>
       </span>
       <span class="side end">
         <button class="spd num" aria-label="Playback speed {now.speed}×" onclick={nextSpeed}>{now.speed.toFixed(1)}×</button>
@@ -108,6 +111,8 @@
   .ctl { display: flex; align-items: center; gap: 30px; }
   .ico { color: var(--text-dim); display: grid; place-items: center; width: 28px; height: 28px; transition: color 0.14s ease; }
   .ico:hover { color: var(--text); }
+  .step { color: var(--text-faint); }
+  .step:disabled { opacity: 0.35; pointer-events: none; }
   .play { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--line); color: var(--text); transition: box-shadow 0.14s ease; }
   .play:hover { box-shadow: inset 0 0 0 1px var(--accent); }
   .spd { color: var(--text-faint); transition: color 0.14s ease; }

@@ -70,6 +70,13 @@
     </div>
   </section>
   <section>
+    <div class="lbl">When an episode ends</div>
+    <div class="words" role="group" aria-label="When an episode ends">
+      <button aria-pressed={prefs.autoplay !== 'off'} onclick={() => setPref('autoplay', 'on')}>Play the next one</button>
+      <button aria-pressed={prefs.autoplay === 'off'} onclick={() => setPref('autoplay', 'off')}>Stop</button>
+    </div>
+  </section>
+  <section>
     <div class="lbl">Bring your shows</div>
     <div class="imp">
       <form onsubmit={add}>
