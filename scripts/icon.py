@@ -78,24 +78,23 @@ def srgb(hex_):
 
 
 def package(out: Path):
-    """Icon Composer's format: the artwork fills the whole square (macOS masks it), and each layer's colour is set
-    per appearance, so one glyph drawing serves light, dark, and the tinted and clear styles macOS derives."""
+    """Icon Composer's format: the artwork fills the whole square (macOS masks it). Each layer names a drawing per
+    appearance and keeps the drawing's own colours: a layer fill would flatten the fade and fill the open arcs."""
     (out / "Assets").mkdir(parents=True, exist_ok=True)
     # The tile ran 100..924 of 1024; scale the glyph so it keeps its place in a full-bleed square.
     k = 1024 / 824
     bleed = lambda body: svg(f'<g transform="matrix({k:.5f} 0 0 {k:.5f} {-100 * k:.3f} {-100 * k:.3f})">{body}</g>')
-    (out / "Assets" / "ink.svg").write_text(bleed(ink_part("dark")))
-    (out / "Assets" / "accent.svg").write_text(bleed(accent_part("dark")))
+    for look in LOOKS:
+        (out / "Assets" / f"ink-{look}.svg").write_text(bleed(ink_part(look)))
+        (out / "Assets" / f"accent-{look}.svg").write_text(bleed(accent_part(look)))
 
-    def by_look(key):
-        return [{"value": {"solid": srgb(LOOKS["light"][key])}}, {"appearance": "dark", "value": {"solid": srgb(LOOKS["dark"][key])}}]
-
-    def layer(name, key):
-        return {"name": name, "layers": [{"name": name, "image-name": f"{name}.svg", "glass": False, "fill-specializations": by_look(key)}],
+    def layer(name):
+        return {"name": name, "layers": [{"name": name, "glass": False, "image-name-specializations": [
+                    {"value": f"{name}-light.svg"}, {"appearance": "dark", "value": f"{name}-dark.svg"}]}],
                 "shadow": {"kind": "none", "opacity": 0.5}, "specular": False, "translucency": {"enabled": False, "value": 0.5}}
 
-    icon = {"fill-specializations": by_look("tile"), "groups": [layer("accent", "accent"), layer("ink", "ink")],
-            "supported-platforms": {"squares": ["macOS"]}}
+    tile = [{"value": {"solid": srgb(LOOKS["light"]["tile"])}}, {"appearance": "dark", "value": {"solid": srgb(LOOKS["dark"]["tile"])}}]
+    icon = {"fill-specializations": tile, "groups": [layer("accent"), layer("ink")], "supported-platforms": {"squares": ["macOS"]}}
     (out / "icon.json").write_text(json.dumps(icon, indent=2) + "\n")
 
 

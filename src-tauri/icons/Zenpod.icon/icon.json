@@ -18,19 +18,14 @@
       "layers": [
         {
           "name": "accent",
-          "image-name": "accent.svg",
           "glass": false,
-          "fill-specializations": [
+          "image-name-specializations": [
             {
-              "value": {
-                "solid": "srgb:0.20784,0.35294,0.62745,1.00000"
-              }
+              "value": "accent-light.svg"
             },
             {
               "appearance": "dark",
-              "value": {
-                "solid": "srgb:0.53333,0.65098,0.87843,1.00000"
-              }
+              "value": "accent-dark.svg"
             }
           ]
         }
@@ -50,19 +45,14 @@
       "layers": [
         {
           "name": "ink",
-          "image-name": "ink.svg",
           "glass": false,
-          "fill-specializations": [
+          "image-name-specializations": [
             {
-              "value": {
-                "solid": "srgb:0.24706,0.24706,0.28235,1.00000"
-              }
+              "value": "ink-light.svg"
             },
             {
               "appearance": "dark",
-              "value": {
-                "solid": "srgb:0.65098,0.65882,0.70588,1.00000"
-              }
+              "value": "ink-dark.svg"
             }
           ]
         }
