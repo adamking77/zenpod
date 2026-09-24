@@ -71,7 +71,7 @@
   const warm = (id: number) => { if (id !== current && !warmed.has(id)) { warmed.add(id); invoke('warm', { id }); } };
   // Following's order: by name (as the core sends it), latest episode, or most new. Spotify-only shows stay last,
   // and just-added shows lead the list until you move on.
-  const SORTS = [['name', 'Name'], ['latest', 'Latest'], ['new', 'New']] as const;
+  const SORTS = [['name', 'A–Z'], ['latest', 'Latest'], ['new', 'New']] as const;
   const by: Record<string, (a: Show, b: Show) => number> = {
     latest: (a, b) => (b.latest ?? 0) - (a.latest ?? 0),
     new: (a, b) => b.fresh - a.fresh || (b.latest ?? 0) - (a.latest ?? 0),
