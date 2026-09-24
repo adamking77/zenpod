@@ -57,7 +57,7 @@ Lexend Giga is already wide. Light capitals with open spacing give it a calm, in
 **Lockups**
 
 - **Horizontal:** the mark, then the wordmark, with a gap of half the mark's height. The cap height is about 40% of the mark's height, and they're centred vertically.
-- **Stacked:** the wordmark centred under the mark, a quarter of the mark's height below it, set at about 60% of the mark's width.
+- **Stacked:** the wordmark centred under the mark, a quarter of the mark's height below it, and about 1.5× the mark's width.
 - **Wordmark alone:** fine where the icon is already on screen, such as the DMG window or the About panel.
 
 **Don't**

@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Zenpod Style Guide</title>
 <meta name="description" content="Zenpod 0.3.0: the mark, the wordmark, colour, type, components, the shape and the voice.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,6 +62,7 @@ section { padding-block: 56px; border-top: 1px solid var(--hair); display: grid;
 .hero .wm { font-size: clamp(28px, 5.4vw, 48px); margin-bottom: 18px; }
 .hero .tag { font-weight: 250; font-size: 22px; line-height: 1.3; color: var(--text-mid); margin-bottom: 18px; }
 .hero .meta { display: flex; gap: 18px; flex-wrap: wrap; }
+.hero .meta .caps { color: var(--text-dim); }
 @media (max-width: 620px) { .hero { grid-template-columns: 1fr; gap: 28px; } .hero .tile { width: 132px; } }
 
 /* the mark */
@@ -87,8 +89,8 @@ section { padding-block: 56px; border-top: 1px solid var(--hair); display: grid;
 .lockups { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .lock { border-radius: 10px; padding: 40px 28px; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--hair); min-height: 180px; }
 .lock.day { background: #fbfaf8; color: #3f3f48; } .lock.night { background: #1b1b29; color: #dfe4f0; }
-.lock .h { display: flex; align-items: center; gap: 28px; } .lock .h .tile { width: 56px; } .lock .h .wm { font-size: 22px; }
-.lock .v { display: grid; justify-items: center; gap: 16px; } .lock .v .tile { width: 88px; } .lock .v .wm { font-size: 15px; }
+.lock .h { display: flex; align-items: center; gap: 24px; } .lock .h .tile { width: 48px; } .lock .h .wm { font-size: 26px; }
+.lock .v { display: grid; justify-items: center; gap: 22px; } .lock .v .tile { width: 88px; } .lock .v .wm { font-size: 20px; }
 .lock .solo { font-size: clamp(22px, 4vw, 30px); }
 .specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 18px 28px; }
 .specs div { display: grid; gap: 3px; padding-top: 12px; border-top: 1px solid var(--hair); }
@@ -97,7 +99,7 @@ section { padding-block: 56px; border-top: 1px solid var(--hair); display: grid;
 .dont { display: grid; gap: 10px; padding: 22px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--hair); justify-items: center; }
 .dont .wm { font-size: 18px; }
 .dont .x { font-size: 12.5px; color: var(--text-faint); justify-self: start; }
-@media (max-width: 620px) { .lockups { grid-template-columns: 1fr; } .lock .h { gap: 18px; } .lock .h .wm { font-size: 17px; } }
+@media (max-width: 620px) { .lockups { grid-template-columns: 1fr; } .lock .h { gap: 18px; } .lock .h .tile { width: 36px; } .lock .h .wm { font-size: 19px; } }
 
 /* colour */
 .looks { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -230,7 +232,7 @@ foot, .foot { color: var(--text-faint); font-size: 12.5px; padding-top: 32px; bo
       <div><span class="label">Face</span><b>Lexend Giga</b><span class="sub">Google Fonts, open licence</span></div>
       <div><span class="label">Weight</span><b>200 · ExtraLight</b><span class="sub">Never heavier</span></div>
       <div><span class="label">Case and tracking</span><b>ZENPOD · 0.28em</b><span class="sub">Typed in capitals. Trim 0.28em off the right edge to centre it</span></div>
-      <div><span class="label">Lockup</span><b>Gap ½ mark · cap height 40%</b><span class="sub">Stacked: centred, ¼ mark below, 60% of its width</span></div>
+      <div><span class="label">Lockup</span><b>Gap ½ mark · cap height 40%</b><span class="sub">Stacked: centred, ¼ mark below, 1.5× its width</span></div>
       <div><span class="label">Smallest</span><b>14px</b><span class="sub">Below that, use the mark alone</span></div>
     </div>
     <div class="donts">
