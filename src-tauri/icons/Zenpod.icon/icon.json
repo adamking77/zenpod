@@ -26,6 +26,10 @@
             {
               "appearance": "dark",
               "value": "accent-dark.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "accent-dark.svg"
             }
           ]
         }
@@ -52,6 +56,10 @@
             },
             {
               "appearance": "dark",
+              "value": "ink-dark.svg"
+            },
+            {
+              "appearance": "tinted",
               "value": "ink-dark.svg"
             }
           ]

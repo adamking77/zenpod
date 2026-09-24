@@ -97,7 +97,9 @@ def package(out: Path):
 
     def layer(name):
         return {"name": name, "layers": [{"name": name, "glass": False, "image-name-specializations": [
-                    {"value": f"{name}-light.svg"}, {"appearance": "dark", "value": f"{name}-dark.svg"}]}],
+                    {"value": f"{name}-light.svg"}, {"appearance": "dark", "value": f"{name}-dark.svg"},
+                    # Tinted and Clear are drawn from brightness; the dark drawing has the played part brightest.
+                    {"appearance": "tinted", "value": f"{name}-dark.svg"}]}],
                 "shadow": {"kind": "none", "opacity": 0.5}, "specular": False, "translucency": {"enabled": False, "value": 0.5}}
 
     tile = [{"value": {"solid": srgb(LOOKS["light"]["tile"])}}, {"appearance": "dark", "value": {"solid": srgb(LOOKS["dark"]["tile"])}}]
