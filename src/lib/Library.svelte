@@ -132,6 +132,12 @@
     list.scrollTop = 0;
   }
 
+  // The list on screen leads previous, next and autoplay whenever the playing episode is in it.
+  $effect(() => {
+    const shown = ui.notes ? null : open ? episodes : ui.tab === 'new' ? newest : null;
+    if (current != null && shown?.some((e) => e.id === current)) invoke('follow_list', { queue: shown.map((e) => e.id) });
+  });
+
   const DAY = 86400;
   function bucket(e: Episode) {
     const now = new Date(), start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;

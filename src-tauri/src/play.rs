@@ -128,9 +128,7 @@ pub fn choose(app: AppHandle, core: State<Core>, id: i64, queue: Option<Vec<i64>
     let db = core.db.lock().unwrap();
     let mut now = core.now.lock().unwrap();
     if let Some(q) = queue {
-        let joined = q.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
-        store::set_setting(&db, "queue", &joined).map_err(err)?;
-        now.queue = q;
+        set_queue(&db, &mut now, q)?;
     }
     if now.episode.as_ref().is_some_and(|e| e.id == id) {
         now.place();
@@ -142,6 +140,29 @@ pub fn choose(app: AppHandle, core: State<Core>, id: i64, queue: Option<Vec<i64>
         return Ok(());
     }
     start(&app, &db, &mut now, id)
+}
+
+fn set_queue(db: &rusqlite::Connection, now: &mut Now, q: Vec<i64>) -> R<()> {
+    let joined = q.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+    store::set_setting(db, "queue", &joined).map_err(err)?;
+    now.queue = q;
+    Ok(())
+}
+
+/// The list on screen becomes the queue when the playing episode is in it: previous, next and autoplay follow
+/// what you're looking at, not only where you started.
+#[tauri::command]
+pub fn follow_list(app: AppHandle, core: State<Core>, queue: Vec<i64>) -> R<()> {
+    let db = core.db.lock().unwrap();
+    let mut now = core.now.lock().unwrap();
+    let playing = now.episode.as_ref().map(|e| e.id);
+    if playing.is_none_or(|id| !queue.contains(&id)) || now.queue == queue {
+        return Ok(());
+    }
+    set_queue(&db, &mut now, queue)?;
+    now.place();
+    broadcast(&app, &now);
+    Ok(())
 }
 
 fn start(app: &AppHandle, db: &rusqlite::Connection, now: &mut Now, id: i64) -> R<()> {
