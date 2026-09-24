@@ -1,0 +1,39 @@
+# Compiles the Icon Composer package into Assets.car, which gives Zenpod a light and a dark icon on macOS 26+.
+# Only actool from Xcode 26+ can do this, and the Mac Zenpod is built on doesn't have Xcode. Run this when the
+# icon changes, then commit the artifact's Assets.car as src-tauri/icons/Assets.car; every build uses that file.
+name: Icon
+
+on:
+  workflow_dispatch:
+  push:
+    paths: [src-tauri/icons/Zenpod.icon/**, .github/workflows/icon.yml]
+
+jobs:
+  compile:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile (Tauri's own actool arguments)
+        run: |
+          xcrun actool --version --output-format human-readable-text
+          mkdir -p work/out
+          cp -R src-tauri/icons/Zenpod.icon work/Icon.icon
+          xcrun actool work/Icon.icon --compile work/out --output-format human-readable-text --notices --warnings \
+            --output-partial-info-plist work/out/assetcatalog_generated_info.plist --app-icon Icon --include-all-app-icons \
+            --accent-color AccentColor --enable-on-demand-resources NO --development-region en --target-device mac \
+            --minimum-deployment-target 26.0 --platform macosx
+          test -f work/out/Assets.car
+          assetutil --info work/out/Assets.car | tee work/out/info.json
+      - name: Render each appearance for a look
+        continue-on-error: true
+        run: |
+          ict="$(dirname "$(xcrun --find actool)")/../../Applications/Icon Composer.app/Contents/Executables/ictool"
+          [ -x "$ict" ] || ict="$(xcode-select -p)/../Applications/Icon Composer.app/Contents/Executables/ictool"
+          for look in Default Dark ClearLight ClearDark TintedLight TintedDark; do
+            "$ict" src-tauri/icons/Zenpod.icon --export-image --output-file "work/out/$look.png" \
+              --platform macOS --rendition "$look" --width 512 --height 512 --scale 1 || true
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icon
+          path: work/out/
