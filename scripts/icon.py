@@ -50,20 +50,27 @@ def accent_part(look):
             f'<path d="{arc(START, TURN)}" stroke-width="{RING_W}"/></g><circle cx="{x:.2f}" cy="{y:.2f}" r="{DOT}" fill="{col}"/>')
 
 
+def ink(deg, look):
+    """The ink at this point of the fade, already laid over the tile: Apple's icon renderer ignores SVG opacity."""
+    c, a = LOOKS[look], fade(deg, look)
+    mix = lambda i: round(int(c["tile"][i:i + 2], 16) * (1 - a) + int(c["ink"][i:i + 2], 16) * a)
+    return "#" + "".join(f"{mix(i):02x}" for i in (1, 3, 5))
+
+
 def ink_part(look):
-    col = LOOKS[look]["ink"]
     rays = "".join(
-        f'<line x1="{at(a, RAY_IN)[0]:.2f}" y1="{at(a, RAY_IN)[1]:.2f}" x2="{at(a, r - 6)[0]:.2f}" y2="{at(a, r - 6)[1]:.2f}" stroke-opacity="{fade(a, look):.3f}"/>'
+        f'<line x1="{at(a, RAY_IN)[0]:.2f}" y1="{at(a, RAY_IN)[1]:.2f}" x2="{at(a, r - 6)[0]:.2f}" y2="{at(a, r - 6)[1]:.2f}" stroke="{ink(a, look)}"/>'
         for a, r in RAYS if a >= TURN
     )
-    # SVG has no conic gradient: the ring dries out in short butt-capped steps, round only at its far end.
-    n = 60
+    # SVG has no conic gradient: the ring dries out in short steps, each reaching a little into the next so no seam
+    # shows, round only at its far end.
+    n, step = 60, (END - TURN) / 60
     steps = "".join(
-        f'<path d="{arc(TURN + (END - TURN) * i / n, TURN + (END - TURN) * (i + 1) / n)}" stroke-opacity="{fade(TURN + (END - TURN) * (i + 0.5) / n, look):.3f}"'
+        f'<path d="{arc(TURN + step * i, min(END, TURN + step * (i + 1.4)))}" stroke="{ink(TURN + step * (i + 0.5), look)}"'
         + (' stroke-linecap="round"' if i == n - 1 else "") + "/>"
         for i in range(n)
     )
-    return (f'<g stroke="{col}" fill="none"><g stroke-width="{RAY_W}" stroke-linecap="round">{rays}</g>'
+    return (f'<g fill="none"><g stroke-width="{RAY_W}" stroke-linecap="round">{rays}</g>'
             f'<g stroke-width="{RING_W}">{steps}</g></g>')
 
 
