@@ -335,7 +335,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             log, add_show, refresh, import_opml, import_spotify, import_apple, shows, newest, show_episodes, settings, set_setting,
-            play::playback, play::player_ready, play::choose, play::step, play::toggle, play::seek, play::skip,
+            play::playback, play::player_ready, play::choose, play::step, play::follow_list, play::toggle, play::seek, play::skip,
             play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::transcript, play::keep,
             modes::set_mode, modes::pill_panel, modes::drag_panel, proto::warm
         ])
