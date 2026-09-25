@@ -262,8 +262,24 @@ fn set_setting(app: AppHandle, core: State<Core>, key: String, value: String) ->
     Ok(())
 }
 
+/// Release builds abort on panic with nothing on screen; keep the message and where it happened.
+fn log_panics() {
+    let Some(home) = std::env::var_os("HOME") else { return };
+    let dir = std::path::Path::new(&home).join("Library/Logs/Zenpod");
+    std::panic::set_hook(Box::new(move |info| {
+        use std::io::Write;
+        let _ = std::fs::create_dir_all(&dir);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("panic.log")) {
+            let thread = std::thread::current();
+            let when = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+            let _ = writeln!(f, "--- {when} {} {}\n{info}\n{}", env!("CARGO_PKG_VERSION"), thread.name().unwrap_or("?"), std::backtrace::Backtrace::force_capture());
+        }
+    }));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    log_panics();
     let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init()).plugin(
@@ -317,7 +333,11 @@ pub fn run() {
         })
         .register_asynchronous_uri_scheme_protocol("listener", |ctx, req, responder| {
             let app = ctx.app_handle().clone();
-            tauri::async_runtime::spawn(async move { responder.respond(proto::handle(app, req).await) });
+            // Answer on the main thread: WebKit cancels requests there, so it can't cancel one mid-answer.
+            tauri::async_runtime::spawn(async move {
+                let res = proto::handle(app.clone(), req).await;
+                let _ = app.run_on_main_thread(move || responder.respond(res));
+            });
         })
         // Closing the window only hides it; the player window keeps playing.
         .on_window_event(|w, e| match e {
