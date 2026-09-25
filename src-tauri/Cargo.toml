@@ -40,7 +40,8 @@ codegen-units = 1
 lto = true
 opt-level = 3
 panic = "abort"
-strip = true
+# Keep function names so panic.log and crash reports say where.
+strip = "debuginfo"
 
 # Decoding for loudness peaks is far too slow unoptimised; keep debug builds usable.
 [profile.dev.package."symphonia-bundle-mp3"]
