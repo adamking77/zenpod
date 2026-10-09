@@ -21,7 +21,12 @@ pub fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
            peaks blob, local_path text, kept integer not null default 0,
            unique(show_id, guid));
          create index if not exists episodes_published on episodes(published desc);
-         create table if not exists settings(key text primary key, value text not null);",
+         create table if not exists settings(key text primary key, value text not null);
+         create table if not exists marks(
+           id integer primary key, episode_id integer not null references episodes(id) on delete cascade,
+           start_at real not null, end_at real not null, note text not null default '',
+           quote text, chapter text, created integer not null default (unixepoch()));
+         create index if not exists marks_episode on marks(episode_id, start_at);",
     )?;
     Ok(db)
 }
@@ -259,4 +264,83 @@ pub fn spent_copies(db: &Connection) -> rusqlite::Result<Vec<(i64, String)>> {
 
 pub fn transcript_url(db: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
     db.query_row("select transcript_url from episodes where id = ?1", [id], |r| r.get(0))
+}
+
+/// A note: the stretch of an episode it keeps, the listener's words, and what was said there. Called a mark in
+/// code because the show's own notes are already `description` / `episode_notes`.
+#[derive(Serialize, Clone)]
+pub struct MarkRow {
+    pub id: i64,
+    pub episode_id: i64,
+    pub start: f64,
+    pub end: f64,
+    pub note: String,
+    pub quote: Option<String>,
+    pub chapter: Option<String>,
+    pub created: i64,
+    pub show_id: i64,
+    pub show_title: String,
+    pub episode_title: String,
+    pub image_url: Option<String>,
+}
+
+const MARK_FROM: &str = "select m.id, m.episode_id, m.start_at, m.end_at, m.note, m.quote, m.chapter, m.created,
+  e.show_id, s.title, e.title, coalesce(s.image_url, e.image_url)
+  from marks m join episodes e on e.id = m.episode_id join shows s on s.id = e.show_id";
+
+fn mark_row(r: &rusqlite::Row) -> rusqlite::Result<MarkRow> {
+    Ok(MarkRow {
+        id: r.get(0)?,
+        episode_id: r.get(1)?,
+        start: r.get(2)?,
+        end: r.get(3)?,
+        note: r.get(4)?,
+        quote: r.get(5)?,
+        chapter: r.get(6)?,
+        created: r.get(7)?,
+        show_id: r.get(8)?,
+        show_title: r.get(9)?,
+        episode_title: r.get(10)?,
+        image_url: r.get(11)?,
+    })
+}
+
+pub fn add_mark(db: &Connection, episode: i64, start: f64, end: f64, quote: Option<&str>, chapter: Option<&str>) -> rusqlite::Result<MarkRow> {
+    let id: i64 = db.query_row(
+        "insert into marks(episode_id, start_at, end_at, quote, chapter) values(?1, ?2, ?3, ?4, ?5) returning id",
+        params![episode, start, end, quote, chapter],
+        |r| r.get(0),
+    )?;
+    db.query_row(&format!("{MARK_FROM} where m.id = ?1"), [id], mark_row)
+}
+
+pub fn marks(db: &Connection, episode: i64) -> rusqlite::Result<Vec<MarkRow>> {
+    let mut st = db.prepare(&format!("{MARK_FROM} where m.episode_id = ?1 order by m.start_at"))?;
+    let rows = st.query_map([episode], mark_row)?;
+    rows.collect()
+}
+
+pub fn all_marks(db: &Connection) -> rusqlite::Result<Vec<MarkRow>> {
+    let mut st = db.prepare(&format!("{MARK_FROM} order by m.created desc, m.id desc"))?;
+    let rows = st.query_map([], mark_row)?;
+    rows.collect()
+}
+
+/// The episode a note belongs to, if the note exists.
+pub fn mark_episode(db: &Connection, id: i64) -> rusqlite::Result<Option<i64>> {
+    db.query_row("select episode_id from marks where id = ?1", [id], |r| r.get(0)).optional()
+}
+
+pub fn set_mark_note(db: &Connection, id: i64, note: &str) -> rusqlite::Result<()> {
+    db.execute("update marks set note = ?2 where id = ?1", params![id, note])?;
+    Ok(())
+}
+
+pub fn remove_mark(db: &Connection, id: i64) -> rusqlite::Result<()> {
+    db.execute("delete from marks where id = ?1", [id])?;
+    Ok(())
+}
+
+pub fn marked_episodes(db: &Connection) -> rusqlite::Result<Vec<i64>> {
+    db.prepare("select distinct episode_id from marks")?.query_map([], |r| r.get(0))?.collect()
 }

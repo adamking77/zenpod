@@ -5,6 +5,8 @@
   import { prefs, setPref } from '$lib/prefs.svelte';
   import { ui } from '$lib/ui.svelte';
   import Signal from '$lib/Signal.svelte';
+  import Plate from '$lib/Plate.svelte';
+  import { plate, plateApi } from '$lib/marks.svelte';
   import { castFrom } from '$lib/cast';
   import { I } from '$lib/icons';
 
@@ -41,7 +43,7 @@
         <span class="sub"><button class="show" onclick={() => (ui.showing = e.show_id)}>{e.show_title}</button>{#if chapter?.title} · {chapter.title}{/if}</span>
       </div>
     </div>
-    <div class="stage"><Signal {mode} /></div>
+    <div class="stage"><Signal {mode} /><Plate /></div>
     <div class="tp">
       <span class="side">
         <span class="num">{fmt(t)}</span>
@@ -63,6 +65,8 @@
         <button class="ico step" aria-label="Next episode" disabled={!now.next} onclick={() => player.step(1)}>{@html I.next}</button>
       </span>
       <span class="side end">
+        <button class="ico note" class:on={plate.mode != null && plate.mode !== 'peek'} aria-label="Keep the last 30 seconds and write a note"
+          title="Keep the last 30 seconds and write a note (M keeps them without stopping)" onclick={() => plateApi.take(true)}>{@html I.note}</button>
         <button class="spd num" aria-label="Playback speed {now.speed}×" onclick={nextSpeed}>{now.speed.toFixed(1)}×</button>
         <span class="num">{left}</span>
       </span>
@@ -94,15 +98,16 @@
   .title { width: 100%; text-align: left; max-width: 22ch; font-weight: 250; font-size: 28px; line-height: 1.18; letter-spacing: -0.012em; margin: 0 0 4px; text-wrap: balance;
     display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .title:hover { color: var(--accent); }
-  .stage { min-height: 0; display: grid; align-items: center; }
+  .stage { position: relative; min-height: 0; display: grid; align-items: center; }
   .vz { display: flex; gap: 12px; }
   .vz button { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); transition: color 0.14s ease; }
   .vz button:hover { color: var(--text-dim); }
   .vz button[aria-pressed="true"] { color: var(--text); }
   .tp { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: "a ctl b"; align-items: center; gap: 20px; margin-top: 6px; }
   .tp > .side:first-child { grid-area: a; } .tp > .ctl { grid-area: ctl; } .tp > .end { grid-area: b; }
-  /* Narrow: transport on its own line, the quieter readouts beneath it. */
-  @container (max-width: 575px) {
+  /* Narrow: transport on its own line, the quieter readouts beneath it. One row needs about 700px: the time and views
+     (~200), the transport (~270), the note button, speed and time left (~150), and the gaps; below that they'd collide. */
+  @container (max-width: 699px) {
     .tp { grid-template-columns: 1fr 1fr; grid-template-areas: "ctl ctl" "a b"; row-gap: 14px; }
     .tp > .ctl { justify-self: center; }
   }
@@ -112,6 +117,7 @@
   .ico { color: var(--text-dim); display: grid; place-items: center; width: 28px; height: 28px; transition: color 0.14s ease; }
   .ico:hover { color: var(--text); }
   .step { color: var(--text-faint); }
+  .note.on { color: var(--accent); }
   .step:disabled { opacity: 0.35; pointer-events: none; }
   .play { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--line); color: var(--text); transition: box-shadow 0.14s ease; }
   .play:hover { box-shadow: inset 0 0 0 1px var(--accent); }

@@ -8,5 +8,7 @@ export const I = {
   next: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"><path d="M12.5 3.5v9"/><path d="M3.5 3.5v9L10.5 8z"/></svg>',
   win: '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor"><path d="M8.5 1.5h4v4M12.5 1.5L8 6M5.5 12.5h-4v-4M1.5 12.5L6 8"/></svg>',
   mini: '<svg width="12" height="14" viewBox="0 0 12 14" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="11" height="13" rx="3"/><circle cx="6" cy="5.5" r="2.5"/></svg>',
+  /* a note: the open circle with the accent heart that the shape draws */
+  note: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="9" cy="9" r="5.5"/><circle cx="9" cy="9" r="1.8" fill="currentColor" stroke="none"/></svg>',
   pill: '<svg width="18" height="8" viewBox="0 0 18 8" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="17" height="7" rx="3.5"/><circle cx="4" cy="4" r="1.5"/></svg>',
 };

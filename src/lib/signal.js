@@ -164,6 +164,33 @@ export function drawChapters(c, w, h, mode, starts, duration, progress){
   }
 }
 
+/* Notes, as the film drew them: the 30 seconds as a span along the line (an arc on the chapter ring), ending in a
+   larger open circle with the accent at its heart. A new one grows back from its end. Returns where each ring sits. */
+export function drawMarks(c, w, h, mode, list, duration, opts = {}){
+  const out = [];
+  if (!duration || !list.length) return out;
+  const base = getComputedStyle(document.documentElement).getPropertyValue('--base').trim() || '#000';
+  const R = Math.min(w, h)*(opts.inner || .165), small = opts.small, t = performance.now();
+  c.lineCap = 'round';
+  for (const m of list){
+    const p1 = Math.min(1, m.end/duration), p0 = Math.max(0, m.start/duration);
+    const g = opts.grown?.get(m.id), k = g ? Math.min(1, Math.max(0, (t - g)/300)) : 1, e = opts.reduced ? 1 : 1 - Math.pow(1 - k, 3), lit = m.id === opts.lit;
+    let x, y;
+    c.strokeStyle = SIGNAL; c.lineWidth = small ? 1.4 : lit ? 2.6 : 2.2; c.globalAlpha = lit ? 1 : .85; c.beginPath();
+    if (mode === 'orbit'){ const a1 = p1*Math.PI*2 - Math.PI/2, a0 = a1 - (p1 - p0)*Math.PI*2*e; c.arc(w/2, h/2, R, a0, a1); x = w/2 + Math.cos(a1)*R; y = h/2 + Math.sin(a1)*R; }
+    else { x = p1*w; y = h/2; c.moveTo(x - (x - p0*w)*e, y); c.lineTo(x, y); }
+    c.stroke();
+    c.globalAlpha = 1;
+    if (small){ c.fillStyle = SIGNAL; c.beginPath(); c.arc(x, y, 1.8*e, 0, Math.PI*2); c.fill(); }
+    else {
+      c.lineWidth = 1.2; c.fillStyle = base; c.beginPath(); c.arc(x, y, 6.5*e, 0, Math.PI*2); c.fill(); c.stroke();
+      c.fillStyle = SIGNAL; c.beginPath(); c.arc(x, y, 2.6*e, 0, Math.PI*2); c.fill();
+    }
+    out.push({ id: m.id, x, y });
+  }
+  return out;
+}
+
 /* The timeline lives in the clear middle; only a faint baseline runs on into the faded edges. */
 export const INSET = .1;
 export function drawMargins(c, w, h){

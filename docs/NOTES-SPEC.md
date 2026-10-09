@@ -263,3 +263,21 @@ These were considered and left out. Each is a separate decision for later.
 - A writing field in the Mini or Pill.
 - Voice notes, saving the audio itself, and a global shortcut that works from other apps.
 - Transcripts made by Zenpod. Quotes come only from the feed's own transcript.
+
+## 10 · As built
+
+Where the build differs from the sections above, and why.
+
+- **Columns** are `start_at` and `end_at` (`end` is an SQL keyword), and a `chapter` column keeps the chapter's title when the note is taken, for the Markdown and the lists.
+- **The Markdown's frontmatter** also carries `episode_id`. That's how a file is recognised as an episode's own when two episodes would share a name.
+- **The plate fits its space.** When the room above the line is short (small windows), the quote drops to one line and the note scrolls inside its field, so the plate never covers the shape.
+- **Orbit in narrow windows.** Zenpod's default window leaves about 100px beside the Orbit, too little for a plate. When there's less than 200px, the plate sits over the outer rays on the note's side, never over the ring the notes sit on, and the rays behind its words fade as the Field's bars do.
+- **The transport** goes onto its own line below 700px of listening width (it was 575px). With the note button, one row needs about 700px; below that the time left ran into the side pane.
+- **Commands:** `notes_file(episode_id)` tells the Notes list where the file is. `choose` takes an optional `at`, so a note in the Notes tab starts its episode at the note.
+- **Layout check:** `src/lib/plate.check.ts` covers 1512 positions (three window sizes, three views, with and without a quote, four plate states, 21 positions), mutation-tested.
+- **Keys typed straight after M** are kept and go into the note, so a quick typist doesn't lose the first letters while the note is being saved.
+
+Open questions:
+
+- **Unfollowing a show** deletes its episodes and so, by the rule in section 8, their notes. Files already written to the notes folder stay.
+- **Motion:** the film's timing is longer than the design system's 300ms cap; recorded as an exception in `DESIGN.md`.
