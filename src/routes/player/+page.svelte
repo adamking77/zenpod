@@ -60,14 +60,20 @@
     id && placed && invoke('report', { id, position: audio.currentTime, duration: audio.duration || 0, playing: !audio.paused, ended })
       .catch((e) => invoke('log', { msg: `report failed: ${e}` }));
 
+  // Where a load should start. A seek that arrives before the audio is ready (a note opened just after launch) moves
+  // it, rather than being overwritten when the audio arrives.
+  let startAt: number | null = null;
+
   function run(c: Cmd) {
     if (c.kind === 'load') {
       id = Number(c.src.split('/').pop());
       placed = false;
+      startAt = c.position;
       audio.src = c.src;
       audio.playbackRate = c.speed;
       audio.addEventListener('loadedmetadata', () => {
-        audio.currentTime = c.position;
+        audio.currentTime = startAt ?? c.position;
+        startAt = null;
         audio.playbackRate = c.speed;
         placed = true;
       }, { once: true });
@@ -76,7 +82,10 @@
     }
     if (c.kind === 'play') audio.play().catch(() => report());
     if (c.kind === 'pause') audio.pause();
-    if (c.kind === 'seek') { audio.currentTime = c.position; placed = true; }
+    if (c.kind === 'seek') {
+      if (!placed && startAt != null) startAt = c.position;
+      else { audio.currentTime = c.position; placed = true; }
+    }
     if (c.kind === 'speed') audio.playbackRate = c.speed;
   }
 

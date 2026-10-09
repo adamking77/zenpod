@@ -1,6 +1,8 @@
 <script lang="ts">
   import Surface from '$lib/Surface.svelte';
   import Signal from '$lib/Signal.svelte';
+  import MiniNote from '$lib/MiniNote.svelte';
+  import { plate, plateApi } from '$lib/marks.svelte';
   import { fmt, short } from '$lib/api';
   import { goTo, now, player, position } from '$lib/now.svelte';
   import { I } from '$lib/icons';
@@ -12,7 +14,9 @@
 
 <Surface me="mini" radius={18}>
   <div class="mini">
-    <div class="head">
+    <div class="head" class:hold={plate.id != null && plate.mode !== 'peek'}>
+      <button class="ico" class:on={plate.id != null && plate.mode !== 'peek'} aria-label="Keep the last 30 seconds and write a note"
+        title="Keep the last 30 seconds and write a note (M keeps them without stopping)" onclick={() => plateApi.take(true)}>{@html I.note}</button>
       <button class="ico" aria-label="Open the full window" onclick={() => goTo('win')}>{@html I.win}</button>
       <button class="ico" aria-label="Fold into the pill" onclick={() => goTo('pill')}>{@html I.pill}</button>
     </div>
@@ -21,8 +25,7 @@
         <Signal variant="mini" />
         <span class="disc"><img src="listener://localhost/art/{now.episode.show_id}" alt="" /></span>
       </div>
-      <p class="t">{now.episode.title}</p>
-      <p class="s sub">{short(now.episode.show_title)}</p>
+      <MiniNote title={now.episode.title} show={short(now.episode.show_title)} />
       <div class="tp">
         <span class="num">{fmt(t)}</span>
         <span class="ctl">
@@ -44,14 +47,14 @@
     background: radial-gradient(240px 220px at 50% 128px, color-mix(in srgb, var(--cast) var(--cast-pct), transparent), transparent 70%); }
   :global(:root[data-light="flat"]) .mini::before { opacity: 0; }
   .head { position: absolute; top: 10px; right: 10px; display: flex; z-index: 2; opacity: 0; transition: opacity 0.2s var(--ease); }
-  .mini:hover .head, .mini:focus-within .head { opacity: 1; }
+  .mini:hover .head, .mini:focus-within .head, .head.hold { opacity: 1; }
+  .head .ico.on { color: var(--accent); }
   .orb { position: relative; width: 240px; height: 240px; margin: 0 auto; }
   .disc { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; transform: translate(-50%, -50%); border-radius: 50%; overflow: hidden; pointer-events: none; }
   .disc img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .t { position: relative; text-align: center; font-weight: 300; font-size: 16.5px; line-height: 1.3; margin: 2px 0 2px; text-wrap: balance;
-    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .s { position: relative; text-align: center; margin: 0; }
   .tp { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; margin-top: 14px; }
+  /* a two-line note is a little taller than the title it stands in for */
+  .mini:has(:global(.swap.writing)) .tp { margin-top: 6px; }
   .end { justify-self: end; }
   .ctl { display: flex; align-items: center; gap: 18px; }
   .ico { color: var(--text-dim); display: grid; place-items: center; width: 28px; height: 28px; transition: color 0.14s ease; }
