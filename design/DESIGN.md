@@ -71,7 +71,7 @@ The wordmark's face, Lexend Giga, is brand only. The app doesn't bundle it, and 
 | Token | Weight / size / leading | Use |
 | --- | --- | --- |
 | display | 250 / 28 / 1.18, −0.012em | Now-playing title (max 22ch, 3 lines), the empty room |
-| heading | 250 / 24 / 1.2 | Show page, episode notes, Settings |
+| heading | 250 / 24 / 1.2 | Show page, episode pane, Settings |
 | title-s | 300 / 16.5 / 1.3 | Mini title (2 lines, centred) |
 | row | 400 / 14.5 / 1.35 | List rows, library tabs |
 | body | 400 / 14 / 1.5 | Default; reading text at 1.6, max 42ch |
@@ -98,7 +98,7 @@ Rows sit 9px apart vertically, with a 14px gap between cover and text. Sections 
 
 **Icon button.** A 28px hit area with the glyph in `--text-dim`, turning `--text` on hover. Previous and next episode are `--text-faint`, at 35% when there's nothing to step to.
 
-**Word group** (`.words`, `.tabs`, `.reading`, `.vz`). A row of plain words 18px apart, marked with `aria-pressed`. Unchosen words are faint, dim on hover, and the chosen one is full ink. Used for tabs, sorting, Notes/Transcript, Appearance, Light and autoplay.
+**Word group** (`.words`, `.tabs`, `.reading`, `.vz`). A row of plain words 18px apart, marked with `aria-pressed`. Unchosen words are faint, dim on hover, and the chosen one is full ink. Used for tabs, sorting, Show notes/Transcript/Notes, Appearance, Light and autoplay.
 
 **Row.** A cover (34px for an episode, 40px for a show, 6px radius), a title in row type, and a meta line in `sub` plus a `num`. The title turns accent on hover and while playing. Titles cut off with an ellipsis and never wrap.
 
@@ -107,6 +107,8 @@ Rows sit 9px apart vertically, with a 14px gap between cover and text. Sections 
 **Accent swatch.** A 22px circle in a 7-column grid. The chosen one gets a 1px ring 5px out, in its own colour. It scales to 1.12 on hover.
 
 **Remove.** Removing something is a word, never a dialog: "Stop following" becomes "Press again to stop following" and turns red on hover.
+
+**Note** (the listener's, from M or the note button). On the shape: the 30 seconds as a 2.2px accent span along the line (an arc on the Orbit's chapter ring), ending in a 6.5px open ring with a 2.6px accent dot. Beside it, the **plate**, as the demo film drew it: no box, a 1px accent leader out of the ring, then `NOTE · 4:42–5:12` in mono, the transcript quote when there is one, and the note on a field whose underline takes the accent. Placement rules live in `src/lib/plate.ts` and are checked by `src/lib/plate.check.ts`: centred above the line in Field and Thread, beside (or, in narrow windows, over the outer rays of) the Orbit; the shape never moves, only the bars behind the words fade. The episode pane lists notes under **Notes**; the show's own notes are **Show notes**. The code calls a note a mark.
 
 **Quiet note.** A result sentence under what caused it ("3 new shows, 2 you already had."). It arrives from 4–8px below with `@starting-style`, once.
 
@@ -148,7 +150,7 @@ The panel uses a thin **tether** line. Chapters sit on the shape. Light flavors 
 | arrive | 280ms | Next surface after a mode change |
 | light | 400ms | Cast light on or off (ambient) |
 
-Only colour, opacity and transform animate. `prefers-reduced-motion` removes transitions and animations entirely. The app uses no animation library.
+Only colour, opacity and transform animate (and the note's leader, drawn with `stroke-dashoffset`). `prefers-reduced-motion` removes transitions and animations entirely. The note plate is animated with GSAP, the house motion library; everything else is CSS. The plate keeps the film's timing (leader 450ms, plate after 350ms), which is longer than the 300ms `--dur-cap`: a deliberate exception for that one moment.
 
 ## Drift to clean up
 

@@ -2,6 +2,22 @@
   import { api, type Imported } from '$lib/api';
   import { ACCENTS, prefs, setPref } from '$lib/prefs.svelte';
   import { ui } from '$lib/ui.svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { open as pick } from '@tauri-apps/plugin-dialog';
+  import { home } from '$lib/home';
+
+  // Notes folder: each episode's notes also written there as Markdown.
+  let folderNote = $state('');
+  async function chooseFolder() {
+    const dir = await pick({ directory: true, multiple: false, title: 'Notes folder' }).catch(() => null);
+    if (typeof dir !== 'string') return;
+    const n = await invoke<number>('set_notes_folder', { path: dir });
+    folderNote = n ? `${n} episode ${n === 1 ? 'file' : 'files'} written.` : 'Notes will be written here.';
+  }
+  async function stopWriting() {
+    await invoke('set_notes_folder', { path: null });
+    folderNote = 'Notes stay in Zenpod. The files already written are left where they are.';
+  }
   let field: HTMLInputElement;
   $effect(() => { if (ui.paste && field) { field.focus(); ui.paste = false; } });
 
@@ -77,6 +93,18 @@
     </div>
   </section>
   <section>
+    <div class="lbl">Notes folder</div>
+    {#if prefs.notes_folder}
+      <p class="path">{home(prefs.notes_folder)}</p>
+      <p class="hint">Each episode you take notes in gets one Markdown file here, rewritten whenever its notes change.</p>
+      <div class="words"><button class="act" onclick={chooseFolder}>Change</button><button class="act stop" onclick={stopWriting}>Stop writing</button></div>
+    {:else}
+      <p class="hint">Notes stay in Zenpod. Choose a folder and each episode's notes are also written there as a Markdown file.</p>
+      <div class="words"><button class="act" onclick={chooseFolder}>Choose a folder…</button></div>
+    {/if}
+    {#if folderNote}<p class="done" aria-live="polite">{folderNote}</p>{/if}
+  </section>
+  <section>
     <div class="lbl">Bring your shows</div>
     <div class="imp">
       <form onsubmit={add}>
@@ -114,5 +142,11 @@
   .imp input:not([type]) { font: inherit; font-size: 14px; color: var(--text); background: none; border: 0; border-bottom: 1px solid var(--line); padding: 4px 0 6px; outline: none; width: 100%; }
   .imp input:not([type]):focus { border-bottom-color: var(--accent); }
   .imp input::placeholder { color: var(--text-faint); }
+  .path { font-family: var(--font-mono); font-size: 12px; color: var(--text); margin: 0 0 6px; overflow-wrap: anywhere; }
+  .hint { font-size: 12.5px; line-height: 1.5; color: var(--text-dim); margin: 0 0 12px; max-width: 40ch; }
+  .words button.act { color: var(--text); }
+  .words button.act:hover { color: var(--accent); }
+  .words button.stop { color: var(--text-dim); }
+  .words button.stop:hover { color: var(--failed); }
   .done { font-size: 13px; color: var(--text-dim); margin: 12px 0 0; max-width: 40ch; }
 </style>

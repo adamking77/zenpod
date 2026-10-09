@@ -19,7 +19,7 @@ export const position = () =>
 
 export const player = {
   /** `queue` is the list it was chosen from, in order; previous, next and autoplay walk it. */
-  choose: (id: number, queue?: number[]) => invoke('choose', { id, queue }),
+  choose: (id: number, queue?: number[], at?: number) => invoke('choose', { id, queue, at }),
   step: (by: -1 | 1) => invoke('step', { by }),
   toggle: () => invoke('toggle'),
   seek: (position: number) => invoke('seek', { position }),
@@ -41,12 +41,16 @@ export async function loadChapters(id: number) {
 
 export const chapterAt = (t: number) => chapters.list.findLast((c) => c.start <= t + 0.5) ?? null;
 
-/** Space plays and pauses, arrows skip; the same on every surface. */
+/** What M does on this surface: the main window opens its plate; the others keep a note with no words. */
+export const hooks = { note: () => {} };
+
+/** Space plays and pauses, arrows skip, M keeps the last 30 seconds as a note; the same on every surface. */
 export function keys(e: KeyboardEvent) {
-  if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey) return;
   if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); player.toggle(); }
   if (e.key === 'ArrowLeft') player.skip(-15);
   if (e.key === 'ArrowRight') player.skip(30);
+  if ((e.key === 'm' || e.key === 'M') && !e.altKey && !e.repeat) { e.preventDefault(); hooks.note(); }
 }
 
 /** Leave this surface for another, with the closing surface folding away first. */

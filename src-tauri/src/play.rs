@@ -121,16 +121,22 @@ pub fn player_ready(app: AppHandle, core: State<Core>) {
     }
 }
 
-/// Choosing an episode plays it from its saved position; choosing the one already loaded resumes it.
-/// `queue` is the list it was chosen from. If the player can't start, it reports back and the state returns to paused.
+/// Choosing an episode plays it from its saved position, or from `at` (a note's start); choosing the one already
+/// loaded resumes it. `queue` is the list it was chosen from. If the player can't start, it reports back and the state
+/// returns to paused.
 #[tauri::command]
-pub fn choose(app: AppHandle, core: State<Core>, id: i64, queue: Option<Vec<i64>>) -> R<()> {
+pub fn choose(app: AppHandle, core: State<Core>, id: i64, queue: Option<Vec<i64>>, at: Option<f64>) -> R<()> {
     let db = core.db.lock().unwrap();
     let mut now = core.now.lock().unwrap();
     if let Some(q) = queue {
         set_queue(&db, &mut now, q)?;
     }
     if now.episode.as_ref().is_some_and(|e| e.id == id) {
+        if let Some(t) = at {
+            let max = if now.duration > 0.0 { now.duration } else { f64::MAX };
+            now.position = t.clamp(0.0, max);
+            send(&app, Cmd::Seek { position: now.position });
+        }
         now.place();
         if !now.playing {
             now.playing = true;
@@ -139,7 +145,7 @@ pub fn choose(app: AppHandle, core: State<Core>, id: i64, queue: Option<Vec<i64>
         broadcast(&app, &now);
         return Ok(());
     }
-    start(&app, &db, &mut now, id)
+    start(&app, &db, &mut now, id, at)
 }
 
 fn set_queue(db: &rusqlite::Connection, now: &mut Now, q: Vec<i64>) -> R<()> {
@@ -165,10 +171,10 @@ pub fn follow_list(app: AppHandle, core: State<Core>, queue: Vec<i64>) -> R<()> 
     Ok(())
 }
 
-fn start(app: &AppHandle, db: &rusqlite::Connection, now: &mut Now, id: i64) -> R<()> {
+fn start(app: &AppHandle, db: &rusqlite::Connection, now: &mut Now, id: i64, at: Option<f64>) -> R<()> {
     persist(db, now);
     let e = store::episode(db, id).map_err(err)?.ok_or("That episode is gone.")?;
-    now.position = if e.played { 0.0 } else { e.position };
+    now.position = at.unwrap_or(if e.played { 0.0 } else { e.position });
     now.duration = e.duration.unwrap_or(0.0);
     now.playing = true;
     now.episode = Some(e);
@@ -187,7 +193,7 @@ pub fn step(app: AppHandle, core: State<Core>, by: isize) -> R<()> {
     let db = core.db.lock().unwrap();
     let mut now = core.now.lock().unwrap();
     match now.beside(by.signum()) {
-        Some(id) => start(&app, &db, &mut now, id),
+        Some(id) => start(&app, &db, &mut now, id, None),
         None => Ok(()),
     }
 }
@@ -273,7 +279,7 @@ pub fn report(app: AppHandle, core: State<Core>, id: i64, position: f64, duratio
             let after = now.at().map_or(&[][..], |i| &now.queue[i + 1..]);
             let next = after.iter().copied().find(|q| store::episode(&db, *q).ok().flatten().is_some_and(|e| !e.played));
             if let Some(next) = next {
-                let _ = start(&app, &db, &mut now, next);
+                let _ = start(&app, &db, &mut now, next, None);
                 return;
             }
         }

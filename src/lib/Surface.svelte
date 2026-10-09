@@ -3,6 +3,7 @@
   import { onMount, type Snippet } from 'svelte';
   import { loadPrefs } from '$lib/prefs.svelte';
   import { arrivals, follow, keys, now } from '$lib/now.svelte';
+  import { followMarks } from '$lib/marks.svelte';
   import { castFrom } from '$lib/cast';
   import { dragPanel } from '$lib/drag';
 
@@ -10,8 +11,8 @@
 
   onMount(() => {
     loadPrefs();
-    const a = follow(), b = arrivals(me);
-    return () => { a.then((f) => f()); b.then((f) => f()); };
+    const a = follow(), b = arrivals(me), c = followMarks();
+    return () => { a.then((f) => f()); b.then((f) => f()); c.then((f) => f()); };
   });
   $effect(() => { if (now.episode) castFrom(now.episode.show_id); });
 </script>

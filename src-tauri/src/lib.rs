@@ -1,4 +1,5 @@
 mod feed;
+mod marks;
 mod modes;
 mod peaks;
 mod play;
@@ -262,6 +263,70 @@ fn set_setting(app: AppHandle, core: State<Core>, key: String, value: String) ->
     Ok(())
 }
 
+/// After any change to an episode's notes: rewrite its file when there's a notes folder, and tell every window.
+fn notes_changed(app: &AppHandle, db: &rusqlite::Connection, episode: i64) {
+    if let Some(dir) = marks::folder(db) {
+        if let Err(e) = marks::write(db, &dir, episode) {
+            eprintln!("[notes] {e}");
+        }
+    }
+    let _ = app.emit("marks", episode);
+}
+
+#[tauri::command]
+fn add_mark(app: AppHandle, core: State<Core>, episode_id: i64, start: f64, end: f64, quote: Option<String>, chapter: Option<String>) -> R<store::MarkRow> {
+    let db = core.db.lock().unwrap();
+    let m = store::add_mark(&db, episode_id, start, end, quote.as_deref(), chapter.as_deref()).map_err(err)?;
+    notes_changed(&app, &db, episode_id);
+    Ok(m)
+}
+
+#[tauri::command]
+fn set_mark_note(app: AppHandle, core: State<Core>, id: i64, note: String) -> R<()> {
+    let db = core.db.lock().unwrap();
+    let Some(episode) = store::mark_episode(&db, id).map_err(err)? else { return Ok(()) };
+    store::set_mark_note(&db, id, note.trim()).map_err(err)?;
+    notes_changed(&app, &db, episode);
+    Ok(())
+}
+
+#[tauri::command]
+fn remove_mark(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
+    let db = core.db.lock().unwrap();
+    let Some(episode) = store::mark_episode(&db, id).map_err(err)? else { return Ok(()) };
+    store::remove_mark(&db, id).map_err(err)?;
+    notes_changed(&app, &db, episode);
+    Ok(())
+}
+
+#[tauri::command]
+fn marks(core: State<Core>, episode_id: i64) -> R<Vec<store::MarkRow>> {
+    store::marks(&core.db.lock().unwrap(), episode_id).map_err(err)
+}
+
+#[tauri::command]
+fn all_marks(core: State<Core>) -> R<Vec<store::MarkRow>> {
+    store::all_marks(&core.db.lock().unwrap()).map_err(err)
+}
+
+/// Where this episode's notes are written, when there's a notes folder.
+#[tauri::command]
+fn notes_file(core: State<Core>, episode_id: i64) -> R<Option<String>> {
+    let db = core.db.lock().unwrap();
+    let (Some(dir), Some(e)) = (marks::folder(&db), store::episode(&db, episode_id).map_err(err)?) else { return Ok(None) };
+    Ok(Some(marks::file_for(&dir, &e).to_string_lossy().into_owned()))
+}
+
+/// Choose the notes folder (or none). Choosing one writes every episode that already has notes; returns how many.
+#[tauri::command]
+fn set_notes_folder(app: AppHandle, core: State<Core>, path: Option<String>) -> R<usize> {
+    let db = core.db.lock().unwrap();
+    let value = path.unwrap_or_default();
+    store::set_setting(&db, "notes_folder", &value).map_err(err)?;
+    let _ = app.emit("settings", ("notes_folder", &value));
+    Ok(marks::folder(&db).map(|dir| marks::write_all(&db, &dir)).unwrap_or(0))
+}
+
 /// Release builds abort on panic with nothing on screen; keep the message and where it happened.
 fn log_panics() {
     let Some(home) = std::env::var_os("HOME") else { return };
@@ -280,7 +345,7 @@ fn log_panics() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     log_panics();
-    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init()).plugin(tauri_plugin_dialog::init());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init()).plugin(
         tauri_plugin_window_state::Builder::new()
@@ -357,7 +422,8 @@ pub fn run() {
             log, add_show, refresh, import_opml, import_spotify, import_apple, shows, newest, show_episodes, settings, set_setting,
             play::playback, play::player_ready, play::choose, play::step, play::follow_list, play::toggle, play::seek, play::skip,
             play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::transcript, play::keep,
-            modes::set_mode, modes::pill_panel, modes::drag_panel, proto::warm
+            modes::set_mode, modes::pill_panel, modes::drag_panel, proto::warm,
+            add_mark, set_mark_note, remove_mark, marks, all_marks, notes_file, set_notes_folder
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

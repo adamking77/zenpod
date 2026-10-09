@@ -3,6 +3,9 @@
   import { listen } from '@tauri-apps/api/event';
   import { api, length, plain, short, type Episode, type Show } from '$lib/api';
   import Settings from '$lib/Settings.svelte';
+  import NotesList from '$lib/NotesList.svelte';
+  import NotesTab from '$lib/NotesTab.svelte';
+  import { marks } from '$lib/marks.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { chapters, goTo, now, player, position } from '$lib/now.svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
@@ -16,7 +19,10 @@
   type Bit = { text: string; href?: string };
   let notes = $state<Bit[][]>([]);
   let cues = $state<Cue[][]>([]);
-  let reading = $state<'notes' | 'transcript'>('notes');
+  // 'notes' is the show's own notes from the feed; 'marks' is the listener's Notes.
+  let reading = $state<'notes' | 'transcript' | 'marks'>('notes');
+  // A note chosen in the Notes tab opens its episode's Notes once that episode is the one loaded.
+  let pendingNotes: number | null = null;
   const linkish = /(https?:\/\/[^\s<>"')]+)/g;
   function bits(el: Element): Bit[] {
     const out: Bit[] = [];
@@ -33,7 +39,8 @@
   }
   $effect(() => {
     const id = now.episode?.id;
-    reading = 'notes';
+    reading = id != null && pendingNotes === id ? 'marks' : 'notes';
+    if (id != null && pendingNotes === id) pendingNotes = null;
     cues = [];
     if (!ui.notes || !id) return;
     invoke<string | null>('episode_notes', { id }).then((html) => {
@@ -174,6 +181,7 @@
     <span class="tabs" role="group" aria-label="Library">
       <button aria-pressed={!ui.notes && ui.tab === 'new'} onclick={() => { ui.tab = 'new'; open = null; ui.notes = false; ui.arrived = null; }}>New</button>
       <button aria-pressed={!ui.notes && ui.tab === 'following'} onclick={() => { ui.tab = 'following'; open = null; ui.notes = false; ui.arrived = null; }}>Following</button>
+      <button aria-pressed={!ui.notes && ui.tab === 'notes'} onclick={() => { ui.tab = 'notes'; open = null; ui.notes = false; ui.arrived = null; }}>Notes</button>
     </span>
     <span class="modes">
       <button aria-label="Mini player" onclick={() => goTo('mini')}>{@html I.mini}</button>
@@ -198,13 +206,14 @@
           {/each}
         </ol>
       {/if}
-      {#if cues.length}
-        <span class="reading" role="group" aria-label="Read">
-          <button aria-pressed={reading === 'notes'} onclick={() => (reading = 'notes')}>Notes</button>
-          <button aria-pressed={reading === 'transcript'} onclick={() => (reading = 'transcript')}>Transcript</button>
-        </span>
-      {/if}
-      {#if reading === 'transcript'}
+      <span class="reading" role="group" aria-label="Read">
+        <button aria-pressed={reading === 'notes'} onclick={() => (reading = 'notes')}>Show notes</button>
+        {#if cues.length}<button aria-pressed={reading === 'transcript'} onclick={() => (reading = 'transcript')}>Transcript</button>{/if}
+        <button aria-pressed={reading === 'marks'} onclick={() => (reading = 'marks')}>Notes{#if marks.list.length}<span class="num count">{marks.list.length}</span>{/if}</button>
+      </span>
+      {#if reading === 'marks'}
+        <NotesList />
+      {:else if reading === 'transcript'}
         {#each cues as p}
           <p class="note">{#each p as c}<button class="cue" class:now={c === spoken} onclick={() => c.start >= 0 && player.seek(c.start)}>{c.text}</button>{' '}{/each}</p>
         {/each}
@@ -215,6 +224,8 @@
       {/if}
     {:else if ui.tab === 'settings'}
       <Settings />
+    {:else if ui.tab === 'notes'}
+      <NotesTab onopen={(id) => { pendingNotes = id; ui.notes = true; }} />
     {:else if ui.tab === 'new'}
       {#each grouped as g (g.label)}
         <div class="day">{g.label}</div>
@@ -310,6 +321,7 @@
   .reading { display: flex; gap: 16px; margin: 0 0 14px; }
   .reading button { font-size: 13px; color: var(--text-faint); transition: color 0.14s ease; }
   .reading button[aria-pressed="true"] { color: var(--text); }
+  .count { margin-left: 6px; font-size: 10.5px; }
   .sort { margin: 2px 0 6px; }
   .note a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
   .note a:hover { text-decoration: underline; }

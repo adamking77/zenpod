@@ -5,6 +5,7 @@
   import { loadPrefs, prefs, setPref } from '$lib/prefs.svelte';
   import { dragWindow } from '$lib/drag';
   import { arrivals, follow, keys, now, player } from '$lib/now.svelte';
+  import { followMarks } from '$lib/marks.svelte';
 
   // The library column: drag its edge to make it narrower or wider; the listening side keeps room for its controls.
   let drag = $state<number | null>(null), vw = $state(1080);
@@ -21,8 +22,8 @@
 
   onMount(() => {
     loadPrefs();
-    const un = follow(), arr = arrivals('win');
-    return () => { un.then((f) => f()); arr.then((f) => f()); };
+    const un = follow(), arr = arrivals('win'), mk = followMarks();
+    return () => { un.then((f) => f()); arr.then((f) => f()); mk.then((f) => f()); };
   });
 
 </script>
