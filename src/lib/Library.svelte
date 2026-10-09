@@ -37,8 +37,11 @@
     walk(el);
     return out;
   }
+  // The episode's id, not the episode: the core sends a fresh episode object with every state report (play, seek),
+  // and reading must only reset when a different episode loads.
+  const epId = $derived(now.episode?.id);
   $effect(() => {
-    const id = now.episode?.id;
+    const id = epId;
     reading = id != null && pendingNotes === id ? 'marks' : 'notes';
     if (id != null && pendingNotes === id) pendingNotes = null;
     cues = [];
