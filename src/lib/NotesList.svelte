@@ -29,7 +29,10 @@
 {#if marks.list.length}
   <ol class="notes">
     {#each marks.list as m (m.id)}
-      <li class:on={t >= m.start && t <= m.end} class:armed={armed === m.id}>
+      <!-- The whole note plays it, as in the prototype; its own buttons and field keep their clicks. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+      <li class:on={t >= m.start && t <= m.end} class:armed={armed === m.id}
+        onclick={(e) => { if (editing !== m.id && !(e.target as Element).closest('button, textarea') && !getSelection()?.toString()) play(m); }}>
         <button class="when" onclick={() => play(m)}><span class="num">{fmt(m.start)}–{fmt(m.end)}</span>{#if m.chapter}<span class="ch">{m.chapter}</span>{/if}</button>
         {#if m.quote}<q>{m.quote}</q>{/if}
         {#if editing === m.id}
@@ -54,7 +57,7 @@
 
 <style>
   .notes { list-style: none; padding: 0; margin: 0 0 18px; }
-  li { padding: 12px 0 13px; border-bottom: 1px solid var(--hair); display: grid; gap: 6px; justify-items: start; }
+  li { cursor: pointer; padding: 12px 0 13px; border-bottom: 1px solid var(--hair); display: grid; gap: 6px; justify-items: start; }
   li:first-child { padding-top: 2px; }
   .when { display: flex; gap: 10px; align-items: baseline; min-width: 0; max-width: 100%; font-size: 12.5px; color: var(--text-faint); text-align: left; }
   .ch { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -70,6 +73,7 @@
   textarea::placeholder { color: var(--text-faint); }
   .acts { display: flex; gap: 16px; font-size: 12.5px; color: var(--text-faint); opacity: 0; transition: opacity var(--dur-base) var(--ease-hover); }
   li:hover .acts, li:focus-within .acts, li.armed .acts { opacity: 1; }
+  li:hover .when .num { color: var(--accent); }
   .acts button { transition: color var(--dur-base) var(--ease-hover); }
   .acts button:hover { color: var(--text); }
   .acts .rm:hover, li.armed .rm { color: var(--failed); }

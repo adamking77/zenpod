@@ -30,14 +30,20 @@
     if (fresh) {
       // As in the film: the leader draws itself out of the note, then the plate arrives at its end.
       gsap.fromTo(lead, { attr: { 'stroke-dashoffset': 1 } }, { attr: { 'stroke-dashoffset': 0 }, duration: (mode === 'peek' ? 0.3 : 0.45) * d, ease: 'power3.inOut' });
-      gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.3 * d, delay: (mode === 'peek' ? 0.15 : 0.35) * d, ease: 'none' });
-    } else { gsap.set(el, { opacity: 1 }); gsap.set(lead, { attr: { 'stroke-dashoffset': 0 } }); }
+      gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.3 * d, delay: (mode === 'peek' ? 0.15 : 0.35) * d, ease: 'none', onComplete: ready });
+    } else { gsap.set(el, { opacity: 1 }); gsap.set(lead, { attr: { 'stroke-dashoffset': 0 } }); ready(); }
     if (mode === 'peek') return;
-    field?.focus({ preventScroll: true });
-    pending = false;
-    if (early) { text = early; early = ''; await tick(); field?.setSelectionRange(text.length, text.length); typed(); return; }
     // Untouched, a quick note's plate leaves on its own: the note stays, with no words.
     if (mode === 'new') timer = window.setTimeout(() => { if (plate.mode === 'new') close(); }, 5000);
+  }
+
+  /** The field takes focus once the plate can be seen: WebKit won't draw a caret in a field focused while invisible.
+   * Anything typed before then was kept, and goes in now. */
+  async function ready() {
+    if (!field || (plate.mode !== 'new' && plate.mode !== 'typing')) return;
+    field.focus({ preventScroll: true });
+    pending = false;
+    if (early) { text = early; early = ''; await tick(); field.setSelectionRange(text.length, text.length); typed(); }
   }
 
   /** M (keeps playing) or the note button (pauses first). */
