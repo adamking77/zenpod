@@ -173,7 +173,7 @@ published: 2025-06-04
 
 What Works · 4 Jun
 
-## 4:42–5:12 · Time Flies
+## [4:42–5:12](zenpod://episode/7?t=282) · Time Flies
 
 > The quote, when the episode has a transcript.
 
@@ -259,8 +259,7 @@ The add, set and remove commands each rewrite that episode's file when a folder 
 These were considered and left out. Each is a separate decision for later.
 
 - Dragging a note's ends to change its length.
-- Clickable times in the Markdown that open Zenpod at that moment (they need the deep-link plugin).
-- A writing field in the Mini or Pill.
+- A writing field in the Pill.
 - Voice notes, saving the audio itself, and a global shortcut that works from other apps.
 - Transcripts made by Zenpod. Quotes come only from the feed's own transcript.
 
@@ -281,3 +280,11 @@ Open questions:
 
 - **Unfollowing a show** deletes its episodes and so, by the rule in section 8, their notes. Files already written to the notes folder stay.
 - **Motion:** the film's timing is longer than the design system's 300ms cap; recorded as an exception in `DESIGN.md`.
+
+## 11 · Added after the first release
+
+Both were approved by Adam on 9 October 2026, after he reviewed the release.
+
+**Clickable times in the Markdown.** Each note's heading links its times: `## [4:42–5:12](zenpod://episode/<id>?t=<seconds>) · Chapter`. Zenpod registers `zenpod://` with macOS through the official `tauri-plugin-deep-link`. Opening a link (from Obsidian, for example) plays that episode from the note's start, brings the main window forward, and opens the episode's Notes. On a cold start the episode loads at the note, paused. The scheme is registered by the installed app bundle, not by `tauri dev`.
+
+**Writing in the Mini.** The note lands on the Mini's ring. The Mini has no room beside its Orbit, so while you write the note takes the place of the title and show lines: `NOTE · time`, a centred field that wraps to two lines and then scrolls, and Undo. After "Saved in Zenpod" the title returns. The transport moves up 8px while a two-line note is open, so everything fits the Mini's 404px. M works as in the main window. A note button joins the Mini's hover controls and stays visible while you write. Prototype: `mockups/marks/mini.html`. The Pill still keeps notes without words.

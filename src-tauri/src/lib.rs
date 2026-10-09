@@ -327,6 +327,18 @@ fn set_notes_folder(app: AppHandle, core: State<Core>, path: Option<String>) -> 
     Ok(marks::folder(&db).map(|dir| marks::write_all(&db, &dir)).unwrap_or(0))
 }
 
+/// Play the linked episode from the note's time, bring the main window forward and show the episode's notes.
+fn open_note_link(app: &AppHandle, url: &str) {
+    let Some((id, t)) = marks::parse_link(url) else { return };
+    if let Err(e) = play::choose(app.clone(), app.state::<Core>(), id, None, Some(t)) {
+        eprintln!("[notes] {url}: {e}");
+        return;
+    }
+    #[cfg(target_os = "macos")]
+    let _ = modes::set_mode(app.clone(), "win".into());
+    let _ = app.emit("show-notes", id);
+}
+
 /// Release builds abort on panic with nothing on screen; keep the message and where it happened.
 fn log_panics() {
     let Some(home) = std::env::var_os("HOME") else { return };
@@ -345,7 +357,10 @@ fn log_panics() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     log_panics();
-    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init()).plugin(tauri_plugin_dialog::init());
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_deep_link::init());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init()).plugin(
         tauri_plugin_window_state::Builder::new()
@@ -384,6 +399,17 @@ pub fn run() {
             play::spawn_player(app.handle())?;
             #[cfg(target_os = "macos")]
             modes::spawn(app.handle())?;
+
+            // A note's time clicked in the notes folder (zenpod://episode/<id>?t=<s>): open the window there.
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let h = app.handle().clone();
+                app.deep_link().on_open_url(move |e| {
+                    for url in e.urls() {
+                        open_note_link(&h, url.as_str());
+                    }
+                });
+            }
 
             // Refresh quietly on launch, then hourly.
             let h = app.handle().clone();

@@ -40,6 +40,20 @@ pub fn file_for(dir: &Path, e: &EpisodeRow) -> PathBuf {
     if !plain.exists() || ours(&plain) { plain } else { dir.join(format!("{base}-{}.md", e.id)) }
 }
 
+/// Where a note's time in the Markdown points: Zenpod, at that episode and second.
+pub fn link(episode: i64, start: f64) -> String {
+    format!("zenpod://episode/{episode}?t={}", start.max(0.0).floor() as u64)
+}
+
+/// A `zenpod://episode/<id>?t=<seconds>` link, read back: the episode and where to start.
+pub fn parse_link(url: &str) -> Option<(i64, f64)> {
+    let rest = url.strip_prefix("zenpod://episode/")?;
+    let (id, query) = rest.split_once('?').unwrap_or((rest, ""));
+    let id = id.trim_end_matches('/').parse().ok()?;
+    let t = query.split('&').find_map(|kv| kv.strip_prefix("t=")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+    Some((id, t.max(0.0)))
+}
+
 pub fn markdown(e: &EpisodeRow, marks: &[MarkRow]) -> String {
     let when = e.published.and_then(|t| chrono::DateTime::from_timestamp(t, 0));
     let mut out = format!("---\ntitle: \"{}\"\nshow: \"{}\"\n", e.title.replace('"', "\\\""), e.show_title.replace('"', "\\\""));
@@ -52,7 +66,8 @@ pub fn markdown(e: &EpisodeRow, marks: &[MarkRow]) -> String {
     }
     out += "\n\n";
     for m in marks {
-        out += &format!("## {}–{}", clock(m.start), clock(m.end));
+        // The times open Zenpod at the note: zenpod://episode/<id>?t=<seconds>.
+        out += &format!("## [{}–{}]({})", clock(m.start), clock(m.end), link(e.id, m.start));
         if let Some(c) = m.chapter.as_deref().filter(|c| !c.is_empty()) {
             out += &format!(" · {c}");
         }
@@ -106,6 +121,15 @@ mod tests {
     }
 
     #[test]
+    fn links_go_both_ways() {
+        assert_eq!(link(7, 282.9), "zenpod://episode/7?t=282");
+        assert_eq!(parse_link("zenpod://episode/7?t=282"), Some((7, 282.0)));
+        assert_eq!(parse_link("zenpod://episode/7"), Some((7, 0.0)));
+        assert_eq!(parse_link("zenpod://episode/x?t=1"), None);
+        assert_eq!(parse_link("https://example.com"), None);
+    }
+
+    #[test]
     fn names_and_times() {
         assert_eq!(slug("We're Not Late (Or, Rethinking the Long-Term)"), "we-re-not-late-or-rethinking-the-long-term");
         assert_eq!(clock(282.4), "4:42");
@@ -116,7 +140,7 @@ mod tests {
     fn markdown_shape() {
         let md = markdown(&ep(), &[mark(282.0, "Temporal bandwidth, for the workshop", Some("To be on time is to be late."))]);
         assert!(md.starts_with("---\ntitle: \"We're Not Late (Or, Rethinking the Long-Term)\"\nshow: \"What Works\"\npublished: 2024-06-04\nepisode_id: 7\n---\n"));
-        assert!(md.contains("\n# We're Not Late (Or, Rethinking the Long-Term)\n\nWhat Works · 4 Jun\n\n## 4:42–5:12 · Time Flies\n\n> To be on time is to be late.\n\nTemporal bandwidth, for the workshop\n"));
+        assert!(md.contains("\n# We're Not Late (Or, Rethinking the Long-Term)\n\nWhat Works · 4 Jun\n\n## [4:42–5:12](zenpod://episode/7?t=282) · Time Flies\n\n> To be on time is to be late.\n\nTemporal bandwidth, for the workshop\n"));
         assert!(markdown(&ep(), &[]).ends_with("No notes yet.\n"));
     }
 

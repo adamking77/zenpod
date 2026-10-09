@@ -102,7 +102,14 @@
     load();
     const un = listen('library', load);
     const up = listen<{ id: number }>('episode', load);
-    return () => { un.then((f) => f()); up.then((f) => f()); };
+    // A note's time clicked in the notes folder opens that episode's Notes here.
+    const sn = listen<number>('show-notes', (e) => {
+      // With the pane open on that episode already (its state arrived first), switch to Notes now; otherwise the
+      // reading reset does it once the pane opens or the episode loads.
+      if (ui.notes && now.episode?.id === e.payload) { pendingNotes = null; reading = 'marks'; }
+      else { pendingNotes = e.payload; ui.notes = true; }
+    });
+    return () => { un.then((f) => f()); up.then((f) => f()); sn.then((f) => f()); };
   });
 
   let feedFix = $state(''), fixNote = $state(''), confirming = $state(false);
