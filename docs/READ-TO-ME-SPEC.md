@@ -411,6 +411,8 @@ Built on `feat/read-to-me` on 10 October 2026, both milestones together. Where t
 - **What a feed or folder already held** is remembered in `read_seen`, so it's never offered again; the 3 newest arrive, oldest first.
 - **Deleting the episode that's loaded** empties the player ("The room is quiet").
 - **Audio** is saved as AAC at the encoder's best variable quality (`afconvert -q 127 -s 3`); a fixed 96 kbps isn't accepted for 22 kHz mono.
+- **After Adam's first test** the pane was reworked so nothing needs a click elsewhere. What you add is one block that changes in place: NEW EPISODE (page cover, title that wraps, length, show, voice, Make the episode; Enter makes it without moving focus), MAKING THE EPISODE (progress and a percentage), then it **plays by itself at 100%** (PLAYING NOW, Pause, Done). Only the reading you asked for plays itself; feed and folder episodes never interrupt. Anything else being made is listed under "Also being made"; finished episodes not yet heard under "Not heard yet".
+- **Your shows say what they are**: Read to me is "Everything you've added · 3 episodes"; a show you named is "A show you made"; feed and folder shows name their source, each with an episode count. **New show** makes an empty show in place, and on a show's page any episode can be moved between Read to me and the shows you named (**Move to…**) or deleted.
 - **Errors in Settings** say "Paste it above" or "Check it above" instead of pointing to Settings.
 
 ### Checked

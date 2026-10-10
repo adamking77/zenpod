@@ -7,6 +7,7 @@ export type Show = {
   kind: string | null; source: string | null; auto: boolean; voice: string | null;
   /** Why a feed or folder show couldn't be checked last time. */
   problem: string | null;
+  episodes: number;
 };
 
 export type Episode = {

@@ -8,6 +8,9 @@
   import { api, length, type Show } from '$lib/api';
   import { now, player } from '$lib/now.svelte';
 
+  // Read to me, start to finish, in one place: paste or drop something, make the episode, and it plays when it's
+  // ready. The one you just asked for stays in a single block that changes as it goes; nothing needs a click elsewhere.
+
   let field = $state<HTMLTextAreaElement>(), entry = $state('');
   // The field takes the cursor whenever the pane is asked for (R, the icon, a card put away).
   $effect(() => { rtm.focus; if (!rtm.card) tick().then(() => field?.focus({ preventScroll: true })); });
@@ -15,7 +18,18 @@
   function keyed(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = entry; entry = ''; take(v); }
   }
-  function grow() { if (field) { field.style.height = 'auto'; field.style.height = `${field.scrollHeight}px`; } }
+  const grow = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; };
+  // Fits a textarea to its words as they change: titles wrap instead of running off the edge.
+  function fit(el: HTMLTextAreaElement) { tick().then(() => grow(el)); }
+
+  // Enter makes the episode from anywhere on the card (but not from the show menu), so paste, Enter, Enter is the
+  // whole thing. Nothing moves the focus, so nothing gets a focus ring it didn't ask for.
+  function enter(e: KeyboardEvent) {
+    if (rtm.card?.kind !== 'item' || e.key !== 'Enter' || e.shiftKey || e.target instanceof HTMLSelectElement) return;
+    if (e.target instanceof HTMLInputElement && e.target.classList.contains('sm') && !rtm.card.newName.trim()) return;
+    e.preventDefault();
+    readCard();
+  }
 
   async function chooseFolder() {
     const d = await pick({ directory: true, multiple: false, title: 'Make a show from a folder' }).catch(() => null);
@@ -26,45 +40,78 @@
     if (typeof f === 'string') takeFile(f);
   }
 
-  const working = $derived(rtm.reads.filter((r) => r.state === 'reading' || r.state === 'queued' || r.state === 'failed'));
+  const cur = $derived(rtm.current);
+  const curRead = $derived(cur ? rtm.reads.find((r) => r.id === cur.read) ?? null : null);
+  const pct = (r: Read | null) => (r?.done && r.pieces ? Math.round((r.done / r.pieces) * 100) : 0);
+  const others = $derived(rtm.reads.filter((r) => r.id !== cur?.read && (r.state === 'reading' || r.state === 'queued' || r.state === 'failed')));
+  const ready = $derived(rtm.ready.filter((e) => e.id !== cur?.episode));
+  const lists = $derived(rtm.shows.filter((s) => s.kind === 'read-to-me' || s.kind === 'items'));
   const cardShow = $derived(rtm.card?.kind === 'item' && rtm.card.to !== 'new' ? rtm.shows.find((s) => s.id === (rtm.card as { to: number }).to) : null);
 
-  function showLine(s: Show) {
-    const mine = rtm.reads.filter((r) => r.show_id === s.id);
-    const lead = mine.some((r) => r.state === 'reading' || r.state === 'queued') ? 'Reading… · ' : s.fresh ? `${s.fresh} new · ` : '';
-    const src = s.kind === 'feed' || s.kind === 'folder' ? `${s.kind === 'folder' ? home(s.source ?? '') : (s.source ?? '').replace(/^https?:\/\//, '')} · ${s.auto ? 'read automatically' : `new ${s.kind === 'feed' ? 'posts' : 'files'} wait for you`}` : 'Things you add one at a time';
-    return { lead, src };
+  const count = (n: number) => `${n} ${n === 1 ? 'episode' : 'episodes'}`;
+  // What each show is, in plain words.
+  function about(s: Show) {
+    if (s.kind === 'read-to-me') return s.episodes ? `Everything you've added · ${count(s.episodes)}` : 'Everything you add lands here';
+    if (s.kind === 'feed') return `New posts from ${(s.source ?? '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0]} · ${count(s.episodes)}`;
+    if (s.kind === 'folder') return `New files in ${home(s.source ?? '')} · ${count(s.episodes)}`;
+    return s.episodes ? `A show you made · ${count(s.episodes)}` : 'A show you made · move episodes here from Read to me';
   }
+  const busy = (s: Show) => rtm.reads.some((r) => r.show_id === s.id && (r.state === 'reading' || r.state === 'queued'));
+
   // A podcast pasted here is followed the usual way, then shown in Following.
   async function follow(url: string) {
     rtm.card = { kind: 'busy', what: 'Following…' };
     try { const [id] = await api.addShow(url); rtm.card = null; ui.reveal = id; ui.tab = 'following'; }
     catch (e) { rtm.card = { kind: 'error', message: String(e) }; }
   }
-  const progress = (r: Read) => r.state === 'queued' ? 'Next to read' : r.done && r.pieces ? `Reading · ${Math.round((r.done / r.pieces) * 100)}%` : 'Starting to read';
-  // After the field, Enter again reads: the card's Read takes the focus.
-  let readButton = $state<HTMLButtonElement>();
-  $effect(() => { if (rtm.card?.kind === 'item') tick().then(() => readButton?.focus({ preventScroll: true })); });
-  const play = (id: number) => player.choose(id, rtm.ready.map((e) => e.id));
+  const play = (id: number) => player.choose(id, ready.map((e) => e.id));
+  function done() { rtm.current = null; rtm.focus++; }
+
+  let naming = $state(false), showName = $state('');
+  async function newShow() {
+    const n = showName.trim();
+    naming = false; showName = '';
+    if (n) await reads.newShow(n);
+  }
 </script>
+
+<svelte:window onkeydown={enter} />
 
 <div class="pane">
   <h2 class="show-h">Read to me</h2>
-  <p class="show-p">Turn articles, feeds, files and folders into shows of your own.</p>
+  <p class="show-p">Paste a link or text, or drop a file, and Zenpod reads it to you as an episode.</p>
 
-  {#if !rtm.card}
-    <div class="take">
-      <textarea bind:this={field} bind:value={entry} rows="1" placeholder="Paste a link, a feed or text" aria-label="A link, a feed or text to read" spellcheck="false" onkeydown={keyed} oninput={grow}></textarea>
-      <span class="ways"><button class="choose" onclick={chooseFile}>Choose file</button><button class="choose" onclick={chooseFolder}>Choose folder</button><span class="or">or drop one on the window</span></span>
+  {#if rtm.card?.kind === 'item'}
+    {@const c = rtm.card}
+    <div class="check">
+      <span class="k">New episode</span>
+      <div class="ep">
+        <Art id={0} kind="items" page={c.title} size={56} />
+        <textarea class="name" rows="1" bind:value={c.title} aria-label="Title" spellcheck="false" use:fit oninput={(e) => grow(e.currentTarget)}></textarea>
+      </div>
+      <span class="from">{c.from} · about {mins(c.text.length)} min</span>
+      <span class="to">Goes into
+        <select aria-label="Show" bind:value={c.to}>
+          {#each lists as s (s.id)}<option value={s.id}>{s.title}</option>{/each}
+          <option value="new">A new show…</option>
+        </select>
+      </span>
+      {#if c.to === 'new'}
+        <!-- svelte-ignore a11y_autofocus -->
+        <input class="name sm" bind:value={c.newName} placeholder="Name the new show" aria-label="New show name" spellcheck="false" autofocus />
+      {/if}
+      <span class="by">Read by {voiceLabel(cardShow)} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
+      <span class="go"><button class="read" onclick={readCard}>Make the episode</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
+      <span class="hint">Press Enter to make it. It starts playing as soon as it's ready.</span>
     </div>
-  {:else if rtm.card.kind === 'busy'}
+  {:else if rtm.card?.kind === 'busy'}
     <p class="quiet busy" aria-live="polite">{rtm.card.what}</p>
-  {:else if rtm.card.kind === 'error'}
+  {:else if rtm.card?.kind === 'error'}
     <div class="check">
       <p class="lede">{rtm.card.message}</p>
       <span class="go"><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Try something else</button></span>
     </div>
-  {:else if rtm.card.kind === 'podcast'}
+  {:else if rtm.card?.kind === 'podcast'}
     {@const c = rtm.card}
     <div class="check">
       <span class="k">A podcast</span>
@@ -76,14 +123,14 @@
         <button class="cancel" onclick={() => (rtm.card = null)}>Cancel</button>
       </span>
     </div>
-  {:else if rtm.card.kind === 'feed' || rtm.card.kind === 'folder'}
+  {:else if rtm.card?.kind === 'feed' || rtm.card?.kind === 'folder'}
     {@const c = rtm.card}
     {@const word = c.kind === 'feed' ? 'posts' : 'files'}
     <div class="check">
-      <span class="k">{c.kind === 'feed' ? 'A feed of articles' : 'A folder'}</span>
+      <span class="k">{c.kind === 'feed' ? 'A blog or newsletter' : 'A folder'}</span>
       <input class="name" bind:value={c.name} aria-label="Show name" spellcheck="false" onkeydown={(e) => e.key === 'Enter' && makeShow()} />
       <span class="from">{c.kind === 'folder' ? home(c.source) : c.source.replace(/^https?:\/\//, '')}</span>
-      <span class="size">{c.items.length} recent {word}{c.count > c.items.length ? ` of ${c.count}` : ''}</span>
+      <p class="lede">Make it a show, and its new {word} become episodes. These are its latest:</p>
       <ul class="posts">{#each c.items as t}<li>{t}</li>{/each}</ul>
       <span class="to">New {word}</span>
       <span class="words">
@@ -93,49 +140,58 @@
       <span class="by">Read by {voiceLabel()} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
       <span class="go"><button class="read" onclick={makeShow}>Make it a show</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
     </div>
-  {:else if rtm.card.kind === 'item'}
-    {@const c = rtm.card}
-    <div class="check">
-      <span class="k">Ready to read</span>
-      <input class="name" bind:value={c.title} aria-label="Title" spellcheck="false" onkeydown={(e) => e.key === 'Enter' && readCard()} />
-      <span class="from">{c.from}</span>
-      <span class="size"><span class="num">{c.text.length.toLocaleString('en-GB')}</span> characters · about {mins(c.text.length)} min</span>
-      <span class="to">Goes into
-        <select aria-label="Show" bind:value={c.to}>
-          {#each rtm.shows.filter((s) => s.kind !== 'feed' && s.kind !== 'folder') as s (s.id)}<option value={s.id}>{s.title}</option>{/each}
-          <option value="new">New show…</option>
-        </select>
-      </span>
-      {#if c.to === 'new'}
-        <!-- svelte-ignore a11y_autofocus -->
-        <input class="name sm" bind:value={c.newName} placeholder="Name the new show" aria-label="New show name" spellcheck="false" autofocus onkeydown={(e) => e.key === 'Enter' && readCard()} />
-      {/if}
-      <span class="by">Read by {voiceLabel(cardShow)} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
-      <span class="go"><button class="read" bind:this={readButton} onclick={readCard}>Read</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
+  {:else}
+    <div class="take">
+      <textarea bind:this={field} bind:value={entry} rows="1" placeholder="Paste a link or text" aria-label="A link or text to read" spellcheck="false" onkeydown={keyed} oninput={(e) => grow(e.currentTarget)}></textarea>
+      <span class="ways"><button class="choose" onclick={chooseFile}>Choose file</button><button class="choose" onclick={chooseFolder}>Choose folder</button><span class="or">or drop one on the window</span></span>
     </div>
+
+    <!-- The one you just asked for: making it, then playing it, in the same place. -->
+    {#if cur}
+      <div class="check now" aria-live="polite">
+        <span class="k">{cur.episode ? 'Playing now' : curRead?.state === 'failed' ? 'Couldn’t make the episode' : curRead?.state === 'queued' ? 'Waiting its turn' : 'Making the episode'}</span>
+        <div class="ep">
+          <Art id={0} kind="items" page={cur.title} size={56} />
+          <span class="name wrap">{cur.title}</span>
+        </div>
+        {#if cur.episode}
+          <span class="lede">It's in your Read to me list too.</span>
+          <span class="go">
+            <button class="read" onclick={() => player.toggle()}>{now.episode?.id === cur.episode && now.playing ? 'Pause' : 'Play'}</button>
+            <button class="cancel" onclick={done}>Done</button>
+          </span>
+        {:else if curRead?.state === 'failed'}
+          <span class="lede err">{curRead.error}</span>
+          <span class="go"><button class="read" onclick={() => reads.now(cur.read)}>Try again</button><button class="cancel" onclick={() => { reads.discard(cur.read); done(); }}>Remove</button></span>
+        {:else}
+          <span class="meter"><i style:width="{pct(curRead)}%"></i></span>
+          <span class="size">{curRead?.state === 'queued' ? 'Another one is being made first.' : pct(curRead) ? `${pct(curRead)}% · it plays when it's done` : 'Starting · it plays when it’s done'}</span>
+          <span class="go"><button class="cancel" onclick={() => { reads.discard(cur.read); done(); }}>Cancel</button></span>
+        {/if}
+      </div>
+    {/if}
   {/if}
 
-  {#if working.length}
-    <div class="day">Reading</div>
-    {#each working as r (r.id)}
+  {#if others.length}
+    <div class="day">Also being made</div>
+    {#each others as r (r.id)}
       <div class="row making" class:failed={r.state === 'failed'}>
         <Art id={r.show_id} kind="items" page={r.title} size={34} />
         <span class="txt"><span class="t">{r.title}</span>
           {#if r.state === 'failed'}
             <span class="m err"><span>{r.error}</span> <button class="act" onclick={() => reads.now(r.id)}>Try again</button> <button class="rm" onclick={() => reads.discard(r.id)}>· Remove</button></span>
           {:else}
-            <span class="m sub">{r.show_title} · {progress(r)}<button class="stop" onclick={() => reads.stop(r.id)}>· Stop</button></span>
+            <span class="m sub">{r.show_title} · {r.state === 'queued' ? 'Next' : `${pct(r)}%`}<button class="stop" onclick={() => reads.stop(r.id)}>· Stop</button></span>
           {/if}
         </span>
-        {#if r.state === 'reading'}<span class="bar"><i style:width="{(r.done / Math.max(1, r.pieces)) * 100}%"></i></span>{/if}
+        {#if r.state === 'reading'}<span class="bar"><i style:width="{pct(r)}%"></i></span>{/if}
       </div>
     {/each}
   {/if}
 
-  <!-- A finished reading lands here, a click from playing; it leaves once heard. -->
-  {#if rtm.ready.length}
-    <div class="day">Ready to listen</div>
-    {#each rtm.ready as e (e.id)}
+  {#if ready.length}
+    <div class="day">Not heard yet</div>
+    {#each ready as e (e.id)}
       <button class="row ready" class:playing={now.episode?.id === e.id} onclick={() => play(e.id)}>
         <Art id={e.show_id} kind={e.show_kind} page={e.title} size={34} />
         <span class="txt"><span class="t">{e.title}</span>
@@ -146,22 +202,29 @@
 
   <div class="day">Your shows</div>
   {#each rtm.shows as s (s.id)}
-    {@const l = showLine(s)}
-    <button class="row show" onclick={() => (ui.yours = { id: s.id, back: 'read' })}>
+    <button class="row show" onclick={() => (ui.yours = { id: s.id, back: 'read' })} title="Open {s.title}">
       <Art id={s.id} kind={s.kind} name={s.title} size={40} />
-      <span class="txt"><span class="t">{s.title}</span><span class="m sub">{#if l.lead}<span class="new">{l.lead}</span>{/if}<span class="src">{l.src}</span></span></span>
+      <span class="txt"><span class="t">{s.title}</span>
+        <span class="m sub">{#if busy(s)}<span class="new">Making an episode · </span>{:else if s.fresh}<span class="new">{s.fresh} new · </span>{/if}<span class="src">{about(s)}</span></span></span>
     </button>
-  {:else}
-    <p class="quiet">Anything you add becomes an episode, with its shape, a transcript and chapters.</p>
   {/each}
+  {#if naming}
+    <!-- svelte-ignore a11y_autofocus -->
+    <input class="name sm newshow" bind:value={showName} placeholder="Name the show" aria-label="New show name" spellcheck="false" autofocus
+      onkeydown={(e) => { if (e.key === 'Enter') newShow(); if (e.key === 'Escape') { naming = false; showName = ''; } }} onblur={newShow} />
+  {:else}
+    <button class="choose more" onclick={() => (naming = true)}>New show</button>
+  {/if}
+  {#if !rtm.shows.some((s) => s.kind === 'feed' || s.kind === 'folder')}
+    <p class="quiet tip">Paste a blog's address, or choose a folder, to make a show that gets new episodes by itself.</p>
+  {/if}
 </div>
 
 <style>
   .show-h { font-weight: 250; font-size: 24px; line-height: 1.2; margin: 4px 0 8px; }
   .show-p { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin: 0 0 14px; max-width: 38ch; }
   .take { display: grid; gap: 10px; margin: 6px 0 22px; }
-  .ways { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-  .ways { gap: 14px; }
+  .ways { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
   .or { font-size: 12.5px; color: var(--text-faint); }
   .posts { list-style: none; margin: 2px 0; padding: 0; display: grid; gap: 4px; }
   .posts li { font-size: 13px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -181,7 +244,14 @@
 
   .check { margin: 0 0 24px; padding: 14px 0 16px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); display: grid; gap: 8px; }
   .k { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; color: var(--text-faint); text-transform: uppercase; }
+  .now .k { color: var(--accent); }
+  /* the episode to be: its page beside its title, which wraps rather than running off the edge */
+  .ep { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; align-items: start; margin: 2px 0 2px; }
   .name { font: 250 19px/1.3 var(--font-ui); letter-spacing: -0.005em; color: var(--text); }
+  .name.wrap { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  textarea.name { font: 250 19px/1.3 var(--font-ui); border-bottom: 1px solid transparent; padding: 0 0 3px; max-height: calc(1.3em * 3 + 3px); }
+  textarea.name:hover { border-bottom-color: var(--hair); }
+  textarea.name:focus { border-bottom-color: var(--accent); }
   input.name { all: unset; box-sizing: border-box; width: 100%; font: 250 19px/1.3 var(--font-ui); letter-spacing: -0.005em; color: var(--text);
     border-bottom: 1px solid transparent; padding: 0 0 3px; caret-color: var(--accent); transition: border-color var(--dur-base) var(--ease-hover); }
   input.name:hover { border-bottom-color: var(--hair); }
@@ -191,6 +261,10 @@
   .from { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .size, .by, .to, .lede { font-size: 13.5px; color: var(--text-mid); }
   .lede { line-height: 1.5; margin: 0; max-width: 40ch; }
+  .lede.err { color: var(--text-dim); }
+  .hint { font-size: 12px; color: var(--text-faint); }
+  .meter { display: block; height: 2px; background: var(--hair); border-radius: 1px; overflow: hidden; margin: 6px 0 2px; }
+  .meter i { display: block; height: 100%; background: var(--accent); transition: width 0.5s var(--ease); }
   select { all: unset; cursor: pointer; color: var(--text); border-bottom: 1px solid var(--line); padding: 0 16px 2px 0; margin-left: 4px; max-width: 220px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     background: linear-gradient(45deg, transparent 50%, var(--text-faint) 50%) right 4px top 55% / 5px 5px no-repeat,
@@ -223,6 +297,9 @@
   .rm:hover { color: var(--failed); }
   .row.failed .m { white-space: normal; line-height: 1.45; font-size: 12.5px; color: var(--text-dim); }
   .act { font-size: inherit; color: var(--accent); margin-left: 2px; }
+  .more { display: block; margin: 8px 0 0; }
+  .newshow { margin: 8px 0 0; }
   .quiet { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; max-width: 34ch; margin: 8px 0 0; }
-  @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+  .tip { font-size: 12.5px; color: var(--text-faint); margin-top: 14px; }
+  @media (prefers-reduced-motion: reduce) { .bar i, .meter i { transition: none; } }
 </style>

@@ -127,6 +127,7 @@ pub struct ShowRow {
     pub voice: Option<String>,
     /// Why a feed or folder show couldn't be checked last time.
     pub problem: Option<String>,
+    pub episodes: i64,
 }
 
 pub fn shows(db: &Connection) -> rusqlite::Result<Vec<ShowRow>> {
@@ -135,7 +136,8 @@ pub fn shows(db: &Connection) -> rusqlite::Result<Vec<ShowRow>> {
            (select count(*) from episodes e where e.show_id = s.id and e.played = 0 and e.position = 0
               and e.published > unixepoch() - 7 * 86400),
            (select max(published) from episodes e where e.show_id = s.id),
-           s.kind, s.source, s.auto, s.voice, s.problem
+           s.kind, s.source, s.auto, s.voice, s.problem,
+           (select count(*) from episodes e where e.show_id = s.id)
          from shows s order by s.spotify_only, lower(s.title)",
     )?;
     let rows = st.query_map([], |r| {
@@ -153,6 +155,7 @@ pub fn shows(db: &Connection) -> rusqlite::Result<Vec<ShowRow>> {
             auto: r.get(10)?,
             voice: r.get(11)?,
             problem: r.get(12)?,
+            episodes: r.get(13)?,
         })
     })?;
     rows.collect()
@@ -583,6 +586,17 @@ pub fn finish_read(db: &Connection, m: &Made) -> rusqlite::Result<i64> {
     Ok(id)
 }
 
+/// Move an episode between shows that take things one at a time (Read to me and the ones you named).
+pub fn move_episode(db: &Connection, id: i64, show: i64) -> rusqlite::Result<bool> {
+    const LISTS: &str = "(select id from shows where kind in ('read-to-me', 'items'))";
+    let n = db.execute(
+        &format!("update episodes set show_id = ?2 where id = ?1 and show_id in {LISTS} and ?2 in {LISTS}"),
+        params![id, show],
+    )?;
+    db.execute("update reads set show_id = ?2 where episode_id = ?1", params![id, show])?;
+    Ok(n > 0)
+}
+
 /// Remove one episode of yours; returns its audio file.
 pub fn delete_episode(db: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
     let path: Option<String> = db.query_row("select local_path from episodes where id = ?1", [id], |r| r.get(0)).optional()?.flatten();
@@ -651,6 +665,21 @@ mod read_tests {
         let w = add_source_read(&db, feed, "Later", "https://b/2", "g2", 300, "waiting", None, false).unwrap().unwrap();
         assert_eq!(queue_waiting(&db, feed).unwrap(), 1);
         assert_eq!(read(&db, w).unwrap().unwrap().state, "queued");
+    }
+
+    #[test]
+    fn episodes_move_only_between_your_lists() {
+        let db = mem();
+        let home = read_to_me(&db).unwrap();
+        let mine = make_show(&db, "Research", "items", None, false).unwrap();
+        let feed = make_show(&db, "Blog", "feed", Some("https://b/feed"), false).unwrap();
+        let r = add_read(&db, home, "Essay", "x", None, 10, "queued").unwrap().unwrap();
+        let e = finish_read(&db, &Made { show: home, read: r, title: "Essay", duration: 1.0, path: "/tmp/e.m4a", description: "", transcript: "t", chapters: None }).unwrap();
+        assert!(move_episode(&db, e, mine).unwrap());
+        assert_eq!(episode(&db, e).unwrap().unwrap().show_id, mine);
+        assert_eq!(read(&db, r).unwrap().unwrap().show_id, mine);
+        assert!(!move_episode(&db, e, feed).unwrap(), "a feed show only takes its own posts");
+        assert_eq!(episode(&db, e).unwrap().unwrap().show_id, mine);
     }
 
     #[test]

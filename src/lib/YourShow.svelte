@@ -29,7 +29,11 @@
   }
   const source = $derived(
     show?.kind === 'feed' ? `New posts from ${(show.source ?? '').replace(/^https?:\/\//, '')}` : show?.kind === 'folder' ? `New files in ${home(show.source ?? '')}`
-      : 'Things you add one at a time, from Read to me or by dropping them on the window.');
+      : show?.kind === 'read-to-me' ? 'Everything you’ve added. Move any of these into a show of your own, or delete what you’re done with.'
+      : 'A show you made. Move episodes into it from Read to me.');
+  // Where an episode can go: Read to me and the shows you named (feed and folder shows keep only their own).
+  const lists = $derived(rtm.shows.filter((s) => (s.kind === 'read-to-me' || s.kind === 'items') && s.id !== id));
+  const movable = $derived(show?.kind === 'read-to-me' || show?.kind === 'items');
   const voices = $derived([['', `Your default (${voiceLabel()})`], ...rtm.mac.map((v) => [`mac:${v.name}`, v.name])]);
 
   async function remove() {
@@ -77,7 +81,7 @@
         <button class="hit" onclick={() => onplay(e, episodes)} aria-label="Play {e.title}"></button>
         <Art id={id} kind={show.kind} page={e.title} size={34} />
         <span class="txt"><span class="t">{e.title}</span>
-          <span class="m sub">{#if e.played === false && e.position === 0 && (e.published ?? 0) > Date.now() / 1000 - 7 * 86400}<span class="new">New</span> · {/if}<span class="num">{length(e)}</span><button class="rm" onclick={() => reads.deleteEpisode(e.id)}>· Delete</button></span></span>
+          <span class="m sub">{#if e.played === false && e.position === 0 && (e.published ?? 0) > Date.now() / 1000 - 7 * 86400}<span class="new">New</span> · {/if}<span class="num">{length(e)}</span>{#if movable && lists.length}<select class="move" aria-label="Move {e.title} to another show" value="" onchange={(ev) => { const to = Number(ev.currentTarget.value); if (to) reads.move(e.id, to); }}><option value="" disabled>Move to…</option>{#each lists as s (s.id)}<option value={s.id}>{s.title}</option>{/each}</select>{/if}<button class="rm" onclick={() => reads.deleteEpisode(e.id)}>· Delete</button></span></span>
       </div>
     {/each}
     {#if !pending.length && !episodes.length}<p class="quiet">Nothing here yet.</p>{/if}
@@ -120,7 +124,9 @@
   .err { color: var(--text-dim); white-space: normal; }
   .act { font-size: inherit; color: var(--accent); margin-left: 4px; }
   .rm { font-size: inherit; color: var(--text-faint); margin-left: 6px; opacity: 0; transition: opacity var(--dur-base) var(--ease-hover), color var(--dur-base) var(--ease-hover); }
-  .row:hover .rm, .rm:focus-visible { opacity: 1; }
+  .row:hover .rm, .rm:focus-visible, .row:hover .move, .move:focus { opacity: 1; }
+  .move { all: unset; pointer-events: auto; cursor: pointer; font-size: inherit; color: var(--text-faint); margin-left: 8px; opacity: 0; transition: opacity var(--dur-base) var(--ease-hover), color var(--dur-base) var(--ease-hover); }
+  .move:hover { color: var(--text); }
   .rm:hover { color: var(--failed); }
   .rm.stop:hover { color: var(--text); }
   .quiet { color: var(--text-dim); font-size: 13.5px; max-width: 32ch; margin-top: 8px; }

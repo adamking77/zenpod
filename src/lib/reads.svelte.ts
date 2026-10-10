@@ -4,6 +4,7 @@ import { api, type Episode, type Show } from '$lib/api';
 import { feedLink, fromHtml, fromText, host, isLink } from '$lib/extract';
 import { prefs } from '$lib/prefs.svelte';
 import { ui } from '$lib/ui.svelte';
+import { player } from '$lib/now.svelte';
 
 export type Read = {
   id: number; show_id: number; show_title: string; episode_id: number | null; title: string; source: string;
@@ -30,6 +31,8 @@ export const rtm = $state({
   card: null as Card | null,
   services: [] as ServiceInfo[],
   mac: [] as MacVoice[],
+  /** The one you just asked for: followed in place from making to playing. */
+  current: null as { read: number; title: string; episode: number | null; error: string | null } | null,
   /** Bumped to put the cursor in the pane's field. */
   focus: 0,
 });
@@ -40,6 +43,7 @@ export async function loadReads() {
   let [reads, shows, newest] = await Promise.all([invoke<Read[]>('reads'), api.shows(), api.newest()]);
   const week = Date.now() / 1000 - 7 * 86400;
   rtm.ready = newest.filter((e) => e.show_kind && !e.played && (e.published ?? 0) > week).slice(0, 5);
+  await follow(reads);
   // Read to me is always there to send things into.
   if (!shows.some((s) => s.kind === 'read-to-me')) { await invoke('read_to_me'); shows = await api.shows(); }
   rtm.reads = reads;
@@ -67,6 +71,19 @@ export function voiceLabel(show?: Show | null) {
     return `${prefs[`voice_${id}_voice`] || s?.voice || ''} on ${s?.name ?? 'the service'}`;
   }
   return prefs.voice_mac || 'the Mac’s voice';
+}
+
+/** The reading you just asked for: when it's an episode, it plays. Nothing else starts by itself. */
+async function follow(reads: Read[]) {
+  const c = rtm.current;
+  if (!c || c.episode) return;
+  const pending = reads.find((r) => r.id === c.read);
+  if (pending) { c.error = pending.state === 'failed' ? pending.error : null; return; }
+  const r = await invoke<Read | null>('read_status', { id: c.read });
+  if (r?.state === 'done' && r.episode_id && rtm.current === c) {
+    c.episode = r.episode_id;
+    player.choose(r.episode_id, [r.episode_id]);
+  } else if (!r) rtm.current = null; // removed meanwhile
 }
 
 /** Open Read to me with the field ready. */
@@ -184,9 +201,9 @@ export async function readCard() {
   const c = rtm.card;
   if (c?.kind !== 'item') return;
   const newShow = c.to === 'new' ? c.newName.trim() || 'New show' : null;
-  await invoke('add_read', { showId: c.to === 'new' ? null : c.to, newShow, title: c.title, source: c.source, text: c.text });
+  const id = await invoke<number>('add_read', { showId: c.to === 'new' ? null : c.to, newShow, title: c.title, source: c.source, text: c.text });
+  rtm.current = { read: id, title: c.title, episode: null, error: null };
   rtm.card = null;
-  rtm.focus++;
 }
 
 export const reads = {
@@ -196,4 +213,6 @@ export const reads = {
   setShow: (id: number, patch: { title?: string; auto?: boolean; voice?: string }) => invoke('set_show', { id, ...patch }),
   removeShow: (id: number) => invoke('remove_show', { id }),
   deleteEpisode: (id: number) => invoke('delete_episode', { id }),
+  newShow: (name: string) => invoke<number>('make_empty_show', { name }),
+  move: (id: number, showId: number) => invoke('move_episode', { id, showId }),
 };

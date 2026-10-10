@@ -477,6 +477,30 @@ fn add_read(app: AppHandle, core: State<Core>, show_id: Option<i64>, new_show: O
     Ok(id)
 }
 
+/// A new, empty show of yours, to move things into.
+#[tauri::command]
+fn make_empty_show(app: AppHandle, core: State<Core>, name: String) -> R<i64> {
+    let name = name.trim();
+    let id = store::make_show(&core.db.lock().unwrap(), if name.is_empty() { "New show" } else { name }, "items", None, false).map_err(err)?;
+    library_changed(&app);
+    Ok(id)
+}
+
+#[tauri::command]
+fn move_episode(app: AppHandle, core: State<Core>, id: i64, show_id: i64) -> R<()> {
+    if !store::move_episode(&core.db.lock().unwrap(), id, show_id).map_err(err)? {
+        return Err("That episode can only stay where it is.".into());
+    }
+    library_changed(&app);
+    Ok(())
+}
+
+/// One read, finished or not: the pane follows the one you just asked for until it's an episode.
+#[tauri::command]
+fn read_status(core: State<Core>, id: i64) -> R<Option<store::ReadRow>> {
+    store::read(&core.db.lock().unwrap(), id).map_err(err)
+}
+
 #[tauri::command]
 fn reads(core: State<Core>) -> R<Vec<store::ReadRow>> {
     store::pending_reads(&core.db.lock().unwrap()).map_err(err)
@@ -744,7 +768,7 @@ pub fn run() {
             add_mark, set_mark_note, remove_mark, marks, all_marks, notes_file, set_notes_folder,
             voice_services, set_voice_key, mac_voices, voice_sample, fetch_page, read_file, read_to_me, add_read, reads,
             read_now, stop_read, discard_read, set_show, remove_show, delete_episode, take_incoming,
-            preview_source, make_source_show, set_read_text, is_folder
+            preview_source, make_source_show, set_read_text, is_folder, read_status, make_empty_show, move_episode
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
