@@ -101,7 +101,7 @@
         <!-- svelte-ignore a11y_autofocus -->
         <input class="name sm" bind:value={c.newName} placeholder="Name the new show" aria-label="New show name" spellcheck="false" autofocus />
       {/if}
-      <span class="by">Read by {voiceLabel(cardShow)} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
+      <span class="by">Voice: {voiceLabel(cardShow)} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
       <span class="go"><button class="read" onclick={readCard}>Listen</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
       <span class="hint">Press Enter to listen. It starts as soon as it's ready.</span>
     </div>
@@ -135,7 +135,7 @@
       <ul class="posts">{#each c.items as t}<li>{t}</li>{/each}</ul>
       <!-- one phrase that's on or off: faint when off, full ink when on -->
       <span class="words"><button aria-pressed={c.auto} onclick={() => (c.auto = !c.auto)}>Read new {word} automatically</button></span>
-      <span class="by">Read by {voiceLabel()} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
+      <span class="by">Voice: {voiceLabel()} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
       <span class="go"><button class="read" onclick={makeShow}>Make it a show</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
     </div>
   {:else}
