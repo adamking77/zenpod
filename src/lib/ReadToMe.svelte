@@ -159,6 +159,7 @@
           <span class="go">
             <button class="read" onclick={() => player.toggle()}>{now.episode?.id === cur.episode && now.playing ? 'Pause' : 'Play'}</button>
             <button class="cancel" onclick={done}>Done</button>
+            <button class="cancel del" onclick={() => { const id = cur.episode!; done(); reads.deleteEpisode(id); }}>Delete</button>
           </span>
         {:else if curRead?.state === 'failed'}
           <span class="lede err">{curRead.error}</span>
@@ -189,14 +190,21 @@
     {/each}
   {/if}
 
+  <!-- Your latest episodes: play, move or delete each one right here, without opening its show. -->
   {#if ready.length}
-    <div class="day">Not heard yet</div>
+    <div class="day">Recently added</div>
     {#each ready as e (e.id)}
-      <button class="row ready" class:playing={now.episode?.id === e.id} onclick={() => play(e.id)}>
+      {@const movable = (e.show_kind === 'read-to-me' || e.show_kind === 'items') && lists.length > 1}
+      <div class="row ready" class:playing={now.episode?.id === e.id} class:heard={e.played && now.episode?.id !== e.id}>
+        <button class="hit" onclick={() => play(e.id)} aria-label="Play {e.title}"></button>
         <Art id={e.show_id} kind={e.show_kind} page={e.title} size={34} />
         <span class="txt"><span class="t">{e.title}</span>
-          <span class="m sub">{e.show_title} · <span class="num">{length(e)}</span> <span class="go-play">{now.episode?.id === e.id ? (now.playing ? 'Playing' : 'Paused') : 'Play'}</span></span></span>
-      </button>
+          <span class="m sub">{e.show_title} · <span class="num">{length(e)}</span> <span class="go-play">{now.episode?.id === e.id ? (now.playing ? 'Playing' : 'Paused') : e.played ? 'Heard' : 'Play'}</span></span>
+          <span class="acts">
+            {#if movable}<select class="move" aria-label="Move {e.title} to another show" value="" onchange={(ev) => { const to = Number(ev.currentTarget.value); if (to) reads.move(e.id, to); }}><option value="" disabled>Move to…</option>{#each lists.filter((s) => s.id !== e.show_id) as s (s.id)}<option value={s.id}>{s.title}</option>{/each}</select>{/if}
+            <button class="del" onclick={() => { if (cur?.episode === e.id) done(); reads.deleteEpisode(e.id); }}>Delete</button>
+          </span></span>
+      </div>
     {/each}
   {/if}
 
@@ -287,6 +295,18 @@
   .row.making .t { color: var(--text-mid); }
   .src { color: var(--text-faint); }
   .go-play { color: var(--accent); margin-left: 4px; }
+  .heard .go-play { color: var(--text-faint); }
+  .row.heard .t { opacity: 0.55; }
+  /* the row plays; its own words (Move to, Delete) sit above the hit area */
+  .row.ready { align-items: start; }
+  .hit { position: absolute; inset: 0; z-index: 0; }
+  .row.ready .txt { position: relative; z-index: 1; pointer-events: none; }
+  .row.ready:hover .t { color: var(--accent); }
+  .acts { display: flex; gap: 14px; margin-top: 3px; font-size: 12.5px; pointer-events: auto; }
+  .acts .move { all: unset; cursor: pointer; color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }
+  .acts .move:hover { color: var(--text); }
+  .del { font-size: inherit; color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }
+  .del:hover { color: var(--failed); }
   .row.playing .t { color: var(--accent); }
   .new { color: var(--accent); }
   .bar { position: absolute; left: 48px; right: 0; bottom: 2px; height: 1px; background: var(--hair); overflow: hidden; }

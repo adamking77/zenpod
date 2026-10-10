@@ -26,7 +26,7 @@ export const rtm = $state({
   reads: [] as Read[],
   /** Your shows, Read to me first. */
   shows: [] as Show[],
-  /** Episodes of yours not yet heard, newest first: what a finished reading turns into, ready to play. */
+  /** Your latest episodes, heard or not, newest first: playable, movable and deletable right in the pane. */
   ready: [] as Episode[],
   card: null as Card | null,
   services: [] as ServiceInfo[],
@@ -41,8 +41,7 @@ export const mins = (chars: number) => Math.max(1, Math.round(chars / 900));
 
 export async function loadReads() {
   let [reads, shows, newest] = await Promise.all([invoke<Read[]>('reads'), api.shows(), api.newest()]);
-  const week = Date.now() / 1000 - 7 * 86400;
-  rtm.ready = newest.filter((e) => e.show_kind && !e.played && (e.published ?? 0) > week).slice(0, 5);
+  rtm.ready = newest.filter((e) => e.show_kind).slice(0, 6);
   await follow(reads);
   // Read to me is always there to send things into.
   if (!shows.some((s) => s.kind === 'read-to-me')) { await invoke('read_to_me'); shows = await api.shows(); }
