@@ -4,7 +4,9 @@ mod modes;
 mod peaks;
 mod play;
 mod proto;
+mod read;
 mod store;
+mod voice;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -20,6 +22,17 @@ pub struct Core {
     fetching: Mutex<HashSet<i64>>,
     /// Enclosure addresses after their tracking redirects.
     urls: Mutex<HashMap<i64, String>>,
+    /// Files opened with Zenpod and zenpod://read links, held until the window takes them (it may not have loaded yet).
+    incoming: Mutex<Vec<Incoming>>,
+}
+
+#[derive(Serialize, Clone)]
+struct Incoming {
+    /// "file" (a path) or "link" (an address to read)
+    kind: &'static str,
+    value: String,
+    /// The show it should go into, when the link names one.
+    show: Option<String>,
 }
 
 type R<T> = Result<T, String>;
@@ -339,6 +352,228 @@ fn open_note_link(app: &AppHandle, url: &str) {
     let _ = app.emit("show-notes", id);
 }
 
+// ---------- Read to me ----------
+
+#[derive(Serialize)]
+struct ServiceInfo {
+    id: &'static str,
+    name: &'static str,
+    model: &'static str,
+    voice: &'static str,
+    /// A key is saved in the Keychain (the key itself never comes back to the page).
+    keyed: bool,
+}
+
+#[tauri::command]
+fn voice_services() -> Vec<ServiceInfo> {
+    let saved = voice::keys_saved();
+    voice::SERVICES
+        .iter()
+        .map(|s| ServiceInfo { id: s.id, name: s.name, model: s.model, voice: s.voice, keyed: saved.get(s.id).copied().unwrap_or(false) })
+        .collect()
+}
+
+#[tauri::command]
+fn set_voice_key(service: String, key: String) -> R<()> {
+    voice::service(&service).ok_or("That service isn't known.")?;
+    voice::set_key(&service, &key)
+}
+
+#[tauri::command]
+async fn mac_voices() -> Vec<voice::MacVoice> {
+    tauri::async_runtime::spawn_blocking(voice::mac_voices).await.unwrap_or_default()
+}
+
+/// One sentence in the current voice (or a show's own), as a data address the page can play.
+#[tauri::command]
+async fn voice_sample(app: AppHandle, show_id: Option<i64>) -> R<String> {
+    let v = {
+        let core = app.state::<Core>();
+        let db = core.db.lock().unwrap();
+        let own = show_id.and_then(|id| store::show_voice(&db, id));
+        voice::resolve(&db, own.as_deref())
+    };
+    let a = voice::speak(&v, voice::SAMPLE).await?;
+    use base64::Engine;
+    let mime = if a.ext == "wav" { "audio/wav" } else { "audio/mpeg" };
+    Ok(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(&a.bytes)))
+}
+
+#[derive(Serialize)]
+struct Page {
+    /// Where the address ended up after redirects.
+    url: String,
+    /// "page" (an article to read), "podcast" (a feed with audio) or "feed" (a feed of articles)
+    kind: &'static str,
+    html: String,
+    title: Option<String>,
+}
+
+/// Fetch an address the person gave and say what it is. The page reads articles itself (Readability).
+#[tauri::command]
+async fn fetch_page(url: String) -> R<Page> {
+    let res = feed::HTTP.get(url.trim()).send().await.map_err(|_| format!("Couldn't reach {}.", url.trim()))?;
+    if !res.status().is_success() {
+        return Err(format!("That page answered with an error ({}).", res.status().as_u16()));
+    }
+    let final_url = res.url().to_string();
+    let ctype = res.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_lowercase();
+    if ctype.starts_with("audio/") || ctype.starts_with("video/") || ctype.starts_with("image/") {
+        return Err("That's not a page with words to read.".into());
+    }
+    let body = res.bytes().await.map_err(err)?;
+    let html = String::from_utf8_lossy(&body[..body.len().min(8 * 1024 * 1024)]).to_string();
+    let head = html.trim_start().get(..400).unwrap_or(html.trim_start()).to_lowercase();
+    let is_feed = ctype.contains("rss") || ctype.contains("atom") || (ctype.contains("xml") && !ctype.contains("html")) || head.starts_with("<?xml") && (head.contains("<rss") || head.contains("<feed")) || head.starts_with("<rss") || head.starts_with("<feed");
+    let title = |s: &str| s.split_once("<title").and_then(|(_, r)| r.split_once('>')).and_then(|(_, r)| r.split_once("</title>")).map(|(t, _)| t.replace("<![CDATA[", "").replace("]]>", "").trim().to_string());
+    let kind = if !is_feed {
+        "page"
+    } else if html.contains("<enclosure") && (html.contains("type=\"audio") || html.contains(".mp3") || html.contains(".m4a")) {
+        "podcast"
+    } else {
+        "feed"
+    };
+    Ok(Page { url: final_url, kind, title: if kind == "page" { None } else { title(&html) }, html })
+}
+
+#[tauri::command]
+async fn read_file(path: String) -> R<read::Doc> {
+    tauri::async_runtime::spawn_blocking(move || read::read_file(std::path::Path::new(&path))).await.map_err(err)?
+}
+
+/// The Read to me show's id, making it the first time.
+#[tauri::command]
+fn read_to_me(core: State<Core>) -> R<i64> {
+    store::read_to_me(&core.db.lock().unwrap()).map_err(err)
+}
+
+/// Queue something to be read into a show of yours: one you name (`new_show`), the one given, or Read to me.
+#[tauri::command]
+fn add_read(app: AppHandle, core: State<Core>, show_id: Option<i64>, new_show: Option<String>, title: String, source: String, text: String) -> R<i64> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Err("There's nothing to read in this.".into());
+    }
+    let id = {
+        let db = core.db.lock().unwrap();
+        let show = match (new_show.as_deref().map(str::trim).filter(|n| !n.is_empty()), show_id) {
+            (Some(name), _) => store::make_show(&db, name, "items", None, false).map_err(err)?,
+            (None, Some(id)) => id,
+            (None, None) => store::read_to_me(&db).map_err(err)?,
+        };
+        let title = if title.trim().is_empty() { "Untitled" } else { title.trim() };
+        let id = store::add_read(&db, show, title, &source, None, text.chars().count() as i64, "queued").map_err(err)?.ok_or("That's already here.")?;
+        let d = read::dir(&app);
+        std::fs::create_dir_all(&d).map_err(err)?;
+        std::fs::write(d.join(format!("{id}.txt")), text).map_err(err)?;
+        id
+    };
+    read::wake();
+    let _ = app.emit("reads", ());
+    library_changed(&app);
+    Ok(id)
+}
+
+#[tauri::command]
+fn reads(core: State<Core>) -> R<Vec<store::ReadRow>> {
+    store::pending_reads(&core.db.lock().unwrap()).map_err(err)
+}
+
+/// Read: a waiting one joins the queue; Try again carries on from the failed piece.
+#[tauri::command]
+fn read_now(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
+    store::set_read_state(&core.db.lock().unwrap(), id, "queued", None).map_err(err)?;
+    read::wake();
+    let _ = app.emit("reads", ());
+    Ok(())
+}
+
+/// Stop: back to waiting. Finished pieces are kept for when it's read again.
+#[tauri::command]
+fn stop_read(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
+    store::set_read_state(&core.db.lock().unwrap(), id, "waiting", None).map_err(err)?;
+    let _ = app.emit("reads", ());
+    Ok(())
+}
+
+/// Remove something that hasn't become an episode yet.
+#[tauri::command]
+fn discard_read(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
+    store::remove_read(&core.db.lock().unwrap(), id).map_err(err)?;
+    let d = read::dir(&app);
+    let _ = std::fs::remove_dir_all(d.join(id.to_string()));
+    let _ = std::fs::remove_file(d.join(format!("{id}.txt")));
+    let _ = app.emit("reads", ());
+    library_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_show(app: AppHandle, core: State<Core>, id: i64, title: Option<String>, auto: Option<bool>, voice: Option<String>) -> R<()> {
+    store::set_show(&core.db.lock().unwrap(), id, title.as_deref().map(str::trim).filter(|t| !t.is_empty()), auto, voice.as_deref()).map_err(err)?;
+    library_changed(&app);
+    Ok(())
+}
+
+fn forget_episode_files(app: &AppHandle, episode: i64) {
+    if let Ok(data) = app.path().app_data_dir() {
+        for kind in ["transcripts", "chapters"] {
+            let _ = std::fs::remove_file(data.join(kind).join(format!("{episode}.txt")));
+        }
+    }
+}
+
+/// Remove a show of yours, its episodes and everything made for them.
+#[tauri::command]
+fn remove_show(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
+    let (episodes, reads) = {
+        let db = core.db.lock().unwrap();
+        (store::show_episode_ids(&db, id).map_err(err)?, store::show_read_ids(&db, id).map_err(err)?)
+    };
+    for e in episodes {
+        forget_episode_files(&app, e);
+    }
+    let d = read::dir(&app);
+    for r in reads {
+        let _ = std::fs::remove_dir_all(d.join(r.to_string()));
+        let _ = std::fs::remove_file(d.join(format!("{r}.txt")));
+    }
+    let _ = app.emit("reads", ());
+    unfollow(app, core, id)
+}
+
+/// Delete one episode of yours: its audio, transcript and chapters go with it.
+#[tauri::command]
+fn delete_episode(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
+    let path = store::delete_episode(&core.db.lock().unwrap(), id).map_err(err)?;
+    if let Some(p) = path {
+        let _ = std::fs::remove_file(p);
+    }
+    forget_episode_files(&app, id);
+    library_changed(&app);
+    Ok(())
+}
+
+/// What arrived from outside (Open With, the Dock, zenpod://read) since the page last asked.
+#[tauri::command]
+fn take_incoming(core: State<Core>) -> Vec<Incoming> {
+    std::mem::take(&mut *core.incoming.lock().unwrap())
+}
+
+fn hand_in(app: &AppHandle, item: Incoming) {
+    app.state::<Core>().incoming.lock().unwrap().push(item);
+    #[cfg(target_os = "macos")]
+    let _ = modes::set_mode(app.clone(), "win".into());
+    let _ = app.emit("incoming", ());
+}
+
+/// zenpod://read?url=…&show=…
+fn open_read_link(app: &AppHandle, url: &tauri::Url) {
+    let q: HashMap<String, String> = url.query_pairs().into_owned().collect();
+    let Some(target) = q.get("url").filter(|u| u.starts_with("http://") || u.starts_with("https://")) else { return };
+    hand_in(app, Incoming { kind: "link", value: target.clone(), show: q.get("show").cloned() });
+}
+
 /// Release builds abort on panic with nothing on screen; keep the message and where it happened.
 fn log_panics() {
     let Some(home) = std::env::var_os("HOME") else { return };
@@ -393,20 +628,27 @@ pub fn run() {
                 now: Mutex::new(play::Now::default()),
                 fetching: Mutex::new(HashSet::new()),
                 urls: Mutex::new(HashMap::new()),
+                incoming: Mutex::new(vec![]),
             });
             play::restore(app.handle());
             play::tidy(app.handle());
             play::spawn_player(app.handle())?;
             #[cfg(target_os = "macos")]
             modes::spawn(app.handle())?;
+            read::spawn(app.handle());
 
             // A note's time clicked in the notes folder (zenpod://episode/<id>?t=<s>): open the window there.
+            // zenpod://read?url=… sends a page to Read to me.
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 let h = app.handle().clone();
                 app.deep_link().on_open_url(move |e| {
                     for url in e.urls() {
-                        open_note_link(&h, url.as_str());
+                        if url.host_str() == Some("read") {
+                            open_read_link(&h, &url);
+                        } else {
+                            open_note_link(&h, url.as_str());
+                        }
                     }
                 });
             }
@@ -449,16 +691,30 @@ pub fn run() {
             play::playback, play::player_ready, play::choose, play::step, play::follow_list, play::toggle, play::seek, play::skip,
             play::set_speed, play::report, play::peaks, episode_notes, unfollow, correct_feed, play::chapters, play::transcript, play::keep,
             modes::set_mode, modes::pill_panel, modes::drag_panel, proto::warm,
-            add_mark, set_mark_note, remove_mark, marks, all_marks, notes_file, set_notes_folder
+            add_mark, set_mark_note, remove_mark, marks, all_marks, notes_file, set_notes_folder,
+            voice_services, set_voice_key, mac_voices, voice_sample, fetch_page, read_file, read_to_me, add_read, reads,
+            read_now, stop_read, discard_read, set_show, remove_show, delete_episode, take_incoming
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, e| {
-            if let RunEvent::Reopen { .. } = e {
+        .run(|app, e| match e {
+            RunEvent::Reopen { .. } => {
                 // The Dock icon brings forward whichever surface is showing; it only opens the window when none is.
                 if !modes::raise(app) {
                     let _ = modes::set_mode(app.clone(), "win".into());
                 }
             }
+            // A file dropped on the Dock icon or opened with Zenpod: Read to me takes it.
+            #[cfg(target_os = "macos")]
+            RunEvent::Opened { urls } => {
+                for u in urls {
+                    if let Ok(p) = u.to_file_path() {
+                        hand_in(app, Incoming { kind: "file", value: p.to_string_lossy().into_owned(), show: None });
+                    } else if u.scheme() == "zenpod" && u.host_str() == Some("read") {
+                        open_read_link(app, &u);
+                    }
+                }
+            }
+            _ => {}
         });
 }

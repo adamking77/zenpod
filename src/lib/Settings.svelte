@@ -5,6 +5,36 @@
   import { invoke } from '@tauri-apps/api/core';
   import { open as pick } from '@tauri-apps/plugin-dialog';
   import { home } from '$lib/home';
+  import { loadVoices, rtm } from '$lib/reads.svelte';
+  import { onMount } from 'svelte';
+
+  // Voice: who reads to you. This Mac's voices, or a service with your own key (kept in the Keychain).
+  onMount(() => { loadVoices(); });
+  const svc = $derived(rtm.services.find((x) => x.id === (prefs.voice_service || 'openai')) ?? rtm.services[0]);
+  const fromService = $derived(prefs.voice_from === 'service');
+  let keyNote = $state(''), sample = $state<{ text: string; bad?: boolean } | null>(null), sampling = $state(false);
+  async function saveKey(e: Event) {
+    const input = e.currentTarget as HTMLInputElement, v = input.value.trim();
+    if (!svc || !v) return;
+    try { await invoke('set_voice_key', { service: svc.id, key: v }); input.value = ''; keyNote = ''; await loadVoices(); }
+    catch (err) { keyNote = String(err); }
+  }
+  async function forgetKey() {
+    if (!svc) return;
+    await invoke('set_voice_key', { service: svc.id, key: '' });
+    await loadVoices();
+  }
+  const svcField = (k: 'model' | 'voice') => svc ? prefs[`voice_${svc.id}_${k}`] || svc[k] : '';
+  const setField = (k: 'model' | 'voice') => (e: Event) => { if (svc) setPref(`voice_${svc.id}_${k}`, (e.currentTarget as HTMLInputElement).value.trim()); };
+  async function playSample() {
+    sampling = true; sample = null;
+    try {
+      const url = await invoke<string>('voice_sample', { showId: null });
+      sample = { text: fromService && svc ? `Playing “${svcField('voice')}” from ${svc.name}` : `Playing ${prefs.voice_mac || 'the Mac’s voice'}` };
+      new Audio(url).play();
+    } catch (err) { sample = { text: String(err).replace(/ (Paste|Check) it in Settings\u00a0›\u00a0Voice\./, ' $1 it above.'), bad: true }; }
+    finally { sampling = false; }
+  }
 
   // Notes folder: each episode's notes also written there as Markdown.
   let folderNote = $state('');
@@ -93,6 +123,45 @@
     </div>
   </section>
   <section>
+    <div class="lbl">Voice</div>
+    <div class="words" role="group" aria-label="Voice from">
+      <button aria-pressed={!fromService} onclick={() => { setPref('voice_from', 'mac'); sample = null; }}>This Mac</button>
+      <button aria-pressed={fromService} onclick={() => { setPref('voice_from', 'service'); sample = null; }}>A service</button>
+    </div>
+    {#if !fromService}
+      <div class="vf">
+        <label for="vf-mac">Voice</label>
+        <select id="vf-mac" value={prefs.voice_mac ?? ''} onchange={(e) => { setPref('voice_mac', e.currentTarget.value); sample = null; }}>
+          <option value="">The Mac's default</option>
+          {#each rtm.mac as v (v.name)}<option value={v.name}>{v.name}</option>{/each}
+        </select>
+      </div>
+      <p class="hint vh">Free, and works without a connection. Better voices appear here once you download them in System Settings › Accessibility › Spoken Content.</p>
+    {:else if svc}
+      <div class="vf">
+        <label for="vf-svc">Service</label>
+        <select id="vf-svc" value={svc.id} onchange={(e) => { setPref('voice_service', e.currentTarget.value); sample = null; keyNote = ''; }}>
+          {#each rtm.services as x (x.id)}<option value={x.id}>{x.name}</option>{/each}
+        </select>
+        {#if svc.id === 'compat'}
+          <label for="vf-addr">Address</label>
+          <input id="vf-addr" class="mono" value={prefs.voice_compat_address || 'http://localhost:8880/v1'} spellcheck="false" onchange={(e) => setPref('voice_compat_address', e.currentTarget.value.trim())} />
+        {/if}
+        <label for="vf-key">API key</label>
+        <input id="vf-key" type="password" spellcheck="false" autocomplete="off"
+          placeholder={svc.keyed ? '••••••••••••' : svc.id === 'compat' ? 'Only if your server asks for one' : `Your ${svc.name} key`}
+          onchange={saveKey} />
+        <span class="note">{#if keyNote}{keyNote}{:else if svc.keyed}Saved in your Keychain · <button class="forget" onclick={forgetKey}>Remove</button>{:else}Kept in your Keychain{/if}</span>
+        <label for="vf-model">Model</label>
+        <input id="vf-model" class="mono" value={svc.id === 'grok' ? '' : svcField('model')} disabled={svc.id === 'grok'} placeholder={svc.id === 'grok' ? 'xAI Grok has no model choice' : ''} spellcheck="false" onchange={setField('model')} />
+        <label for="vf-voice">Voice</label>
+        <input id="vf-voice" class="mono" value={svcField('voice')} spellcheck="false" onchange={setField('voice')} />
+      </div>
+    {/if}
+    <div class="sample"><button class="act" disabled={sampling} onclick={playSample}>{sampling ? 'Reading…' : 'Play a sample'}</button>{#if sample}<span class="said" class:bad={sample.bad}>{sample.text}</span>{/if}</div>
+    <p class="hint vh">Every show reads with this voice unless you give it its own.</p>
+  </section>
+  <section>
     <div class="lbl">Notes folder</div>
     {#if prefs.notes_folder}
       <p class="path">{home(prefs.notes_folder)}</p>
@@ -149,4 +218,24 @@
   .words button.stop { color: var(--text-dim); }
   .words button.stop:hover { color: var(--failed); }
   .done { font-size: 13px; color: var(--text-dim); margin: 12px 0 0; max-width: 40ch; }
+  .vf { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px 14px; align-items: baseline; margin-top: 14px; font-size: 13.5px; }
+  .vf label { color: var(--text-faint); font-size: 12.5px; }
+  .vf input, .vf select { all: unset; box-sizing: border-box; width: 100%; font: 400 13.5px var(--font-ui); color: var(--text); border-bottom: 1px solid var(--line); padding: 3px 0 5px;
+    caret-color: var(--accent); transition: border-color var(--dur-base) var(--ease-hover); }
+  .vf input.mono { font: 400 12.5px var(--font-mono); letter-spacing: 0.01em; }
+  .vf input:focus, .vf select:focus { border-bottom-color: var(--accent); }
+  .vf input:disabled { color: var(--text-faint); border-bottom-style: dashed; }
+  .vf input::placeholder { color: var(--text-faint); }
+  .vf select { cursor: pointer; padding-right: 16px;
+    background: linear-gradient(45deg, transparent 50%, var(--text-faint) 50%) right 4px top 55% / 5px 5px no-repeat,
+      linear-gradient(-45deg, transparent 50%, var(--text-faint) 50%) right 0 top 55% / 5px 5px no-repeat; }
+  .vf .note { grid-column: 2; font-size: 12px; color: var(--text-faint); margin-top: -4px; }
+  .forget { font-size: 12px; color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }
+  .forget:hover { color: var(--failed); }
+  .vh { margin: 10px 0 0; }
+  .sample { display: flex; gap: 12px; align-items: baseline; margin-top: 16px; font-size: 13.5px; flex-wrap: wrap; }
+  .sample .act { font-size: 13.5px; color: var(--accent); }
+  .sample .act:disabled { color: var(--text-faint); }
+  .said { font-size: 12.5px; color: var(--text-dim); }
+  .said.bad { color: var(--failed); }
 </style>

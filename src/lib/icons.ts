@@ -10,5 +10,7 @@ export const I = {
   mini: '<svg width="12" height="14" viewBox="0 0 12 14" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="11" height="13" rx="3"/><circle cx="6" cy="5.5" r="2.5"/></svg>',
   /* a note: the open circle with the accent heart that the shape draws */
   note: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="9" cy="9" r="5.5"/><circle cx="9" cy="9" r="1.8" fill="currentColor" stroke="none"/></svg>',
+  /* Read to me: a page whose last lines have become sound */
+  read: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><rect x="3" y="1.5" width="10" height="13" rx="1.6"/><path d="M5.6 4.8h4.8M5.6 7.1h4.8"/><path d="M5.6 10.6v1.6M7.2 9.6v3.6M8.8 10.2v2.4M10.4 9.9v3"/></svg>',
   pill: '<svg width="18" height="8" viewBox="0 0 18 8" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="17" height="7" rx="3.5"/><circle cx="4" cy="4" r="1.5"/></svg>',
 };

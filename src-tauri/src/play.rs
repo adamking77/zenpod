@@ -391,7 +391,7 @@ mod tests {
     fn queue_edges() {
         let ep = |id| crate::store::EpisodeRow {
             id, show_id: 1, show_title: String::new(), title: String::new(), published: None, duration: None,
-            position: 0.0, played: false, kept: false, offline: false, image_url: None,
+            position: 0.0, played: false, kept: false, offline: false, image_url: None, show_kind: None,
         };
         let mut n = super::Now { queue: vec![5, 6, 7], episode: Some(ep(5)), ..Default::default() };
         n.place();
@@ -412,6 +412,10 @@ pub fn keep(app: AppHandle, core: State<Core>, id: i64, on: bool) -> R<()> {
     let current = core.now.lock().unwrap().episode.as_ref().map(|e| e.id);
     {
         let db = core.db.lock().unwrap();
+        // An episode you made has no copy anywhere else: it stays.
+        if store::episode(&db, id).map_err(err)?.is_some_and(|e| e.show_kind.is_some()) {
+            return Ok(());
+        }
         store::set_kept(&db, id, on).map_err(err)?;
         if !on && current != Some(id) {
             if let Some(p) = store::audio_source(&db, id).map_err(err)?.0 {

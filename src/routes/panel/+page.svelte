@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Art from '$lib/Art.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import Surface from '$lib/Surface.svelte';
   import Signal from '$lib/Signal.svelte';
@@ -17,7 +18,7 @@
   <div class="panel">
     {#if now.episode}
       <div class="top">
-        <span class="cover"><img src="listener://localhost/art/{now.episode.show_id}" alt="" /></span>
+        <span class="cover">{#if now.episode.show_kind}<Art id={now.episode.show_id} kind={now.episode.show_kind} page={now.episode.title} />{:else}<img src="listener://localhost/art/{now.episode.show_id}" alt="" />{/if}</span>
         <div class="who"><div class="t">{now.episode.title}</div><span class="sub">{short(now.episode.show_title)}</span></div>
       </div>
       <div class="tether"><Signal variant="tether" /></div>

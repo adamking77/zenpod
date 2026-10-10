@@ -1,7 +1,13 @@
 // Main-window view state shared by the two panes.
 export const ui = $state({
   notes: false,
-  tab: 'new' as 'new' | 'following' | 'notes' | 'settings',
+  tab: 'new' as 'new' | 'following' | 'notes' | 'settings' | 'read',
+  /** The tab to return to when Settings or Read to me closes. */
+  last: 'new' as 'new' | 'following' | 'notes',
+  /** A show of yours open on its own page, and where its back link goes. */
+  yours: null as { id: number; back: 'read' | 'following' } | null,
+  /** Something is being dragged over the window. */
+  dropping: false,
   /** Nothing followed yet: the room shows its first-light scene. */
   empty: false,
   /** Settings should put the cursor in the address field. */

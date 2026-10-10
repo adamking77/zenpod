@@ -3,12 +3,16 @@ import { invoke } from '@tauri-apps/api/core';
 export type Show = {
   id: number; title: string; author: string | null; about: string | null;
   image_url: string | null; spotify_only: boolean; fresh: number; latest: number | null;
+  /** Set for a show you made: 'read-to-me', 'items', 'feed' or 'folder'. */
+  kind: string | null; source: string | null; auto: boolean; voice: string | null;
 };
 
 export type Episode = {
   id: number; show_id: number; show_title: string; title: string;
   published: number | null; duration: number | null; position: number;
   played: boolean; kept: boolean; offline: boolean; image_url: string | null;
+  /** Set when the episode belongs to a show you made. */
+  show_kind: string | null;
 };
 
 export type Imported = { added: number; had: number; spotify_only: number; failed: number; ids: number[]; unreached: string[] };
@@ -39,7 +43,7 @@ export const minutesLeft = (e: Pick<Episode, 'duration' | 'position'>) =>
   `${Math.max(1, Math.round(((e.duration ?? 0) - e.position) / 60))} min left`;
 
 export const length = (e: Episode) =>
-  e.position > 0 && !e.played && e.duration ? minutesLeft(e) : e.duration ? `${Math.round(e.duration / 60)} min` : '';
+  e.position > 0 && !e.played && e.duration ? minutesLeft(e) : e.duration ? `${Math.max(1, Math.round(e.duration / 60))} min` : '';
 
 export const plain = (html: string | null) =>
   html ? (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').replace(/\s+/g, ' ').trim() : '';

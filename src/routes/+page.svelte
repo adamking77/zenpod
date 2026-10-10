@@ -6,6 +6,9 @@
   import { dragWindow } from '$lib/drag';
   import { arrivals, follow, keys, now, player } from '$lib/now.svelte';
   import { followMarks } from '$lib/marks.svelte';
+  import { followReads, openRead, take, takeFile } from '$lib/reads.svelte';
+  import { ui } from '$lib/ui.svelte';
+  import { getCurrentWebview } from '@tauri-apps/api/webview';
 
   // The library column: drag its edge to make it narrower or wider; the listening side keeps room for its controls.
   let drag = $state<number | null>(null), vw = $state(1080);
@@ -22,13 +25,44 @@
 
   onMount(() => {
     loadPrefs();
-    const un = follow(), arr = arrivals('win'), mk = followMarks();
-    return () => { un.then((f) => f()); arr.then((f) => f()); mk.then((f) => f()); };
+    const un = follow(), arr = arrivals('win'), mk = followMarks(), rd = followReads();
+    // Files dragged in arrive through the window (with their paths); links and text through the page's own drop.
+    const dd = getCurrentWebview().onDragDropEvent((e) => {
+      const p = e.payload;
+      if (p.type === 'enter') { if (p.paths.length) ui.dropping = true; }
+      else if (p.type === 'leave') ui.dropping = false;
+      else if (p.type === 'drop') { ui.dropping = false; if (p.paths[0]) takeFile(p.paths[0]); }
+    });
+    return () => { un.then((f) => f()); arr.then((f) => f()); mk.then((f) => f()); rd.then((f) => f()); dd.then((f) => f()); };
   });
+
+  const typing = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
+  // The player's keys everywhere, and R for Read to me here in the window.
+  function key(e: KeyboardEvent) {
+    keys(e);
+    if ((e.key === 'r' || e.key === 'R') && !typing(e.target) && !e.metaKey && !e.ctrlKey && !e.altKey && !e.repeat) { e.preventDefault(); openRead(); }
+  }
+  // ⌘V with nothing to type into: a link or text goes to Read to me.
+  function paste(e: ClipboardEvent) {
+    if (typing(e.target)) return;
+    const t = e.clipboardData?.getData('text/plain')?.trim();
+    if (t) { e.preventDefault(); take(t); }
+  }
+  let depth = 0;
+  const linkDrag = (e: DragEvent) => !!e.dataTransfer && !e.dataTransfer.types.includes('Files') && (e.dataTransfer.types.includes('text/uri-list') || e.dataTransfer.types.includes('text/plain'));
+  function dragenter(e: DragEvent) { if (!linkDrag(e)) return; e.preventDefault(); depth++; ui.dropping = true; }
+  function dragover(e: DragEvent) { if (!linkDrag(e)) return; e.preventDefault(); e.dataTransfer!.dropEffect = 'copy'; }
+  function dragleave(e: DragEvent) { if (!linkDrag(e)) return; if (--depth <= 0) { depth = 0; ui.dropping = false; } }
+  function drop(e: DragEvent) {
+    if (!linkDrag(e)) return;
+    e.preventDefault(); depth = 0; ui.dropping = false;
+    const d = e.dataTransfer!, uri = d.getData('text/uri-list').split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#'));
+    take(uri || d.getData('text/plain'));
+  }
 
 </script>
 
-<svelte:window onkeydown={keys} bind:innerWidth={vw} />
+<svelte:window onkeydown={key} onpaste={paste} ondragenter={dragenter} ondragover={dragover} ondragleave={dragleave} ondrop={drop} bind:innerWidth={vw} />
 
 <main class="win" use:dragWindow>
   <div class="panes" style:--lib="{lib}px">

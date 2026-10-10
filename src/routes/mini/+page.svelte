@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Art from '$lib/Art.svelte';
   import Surface from '$lib/Surface.svelte';
   import Signal from '$lib/Signal.svelte';
   import MiniNote from '$lib/MiniNote.svelte';
@@ -23,7 +24,7 @@
     {#if now.episode}
       <div class="orb">
         <Signal variant="mini" />
-        <span class="disc"><img src="listener://localhost/art/{now.episode.show_id}" alt="" /></span>
+        <span class="disc">{#if now.episode.show_kind}<Art id={now.episode.show_id} kind={now.episode.show_kind} name={now.episode.show_title} round />{:else}<img src="listener://localhost/art/{now.episode.show_id}" alt="" />{/if}</span>
       </div>
       <MiniNote title={now.episode.title} show={short(now.episode.show_title)} />
       <div class="tp">
