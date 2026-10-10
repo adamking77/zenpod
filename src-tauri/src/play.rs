@@ -187,6 +187,24 @@ fn start(app: &AppHandle, db: &rusqlite::Connection, now: &mut Now, id: i64, at:
     Ok(())
 }
 
+/// An episode that's gone (one of yours, deleted): if it's the one loaded, the room goes quiet.
+pub fn forget(app: &AppHandle, id: i64) {
+    let core = app.state::<Core>();
+    let db = core.db.lock().unwrap();
+    let mut now = core.now.lock().unwrap();
+    if now.episode.as_ref().is_none_or(|e| e.id != id) {
+        return;
+    }
+    send(app, Cmd::Pause);
+    now.episode = None;
+    now.playing = false;
+    now.position = 0.0;
+    now.duration = 0.0;
+    now.place();
+    let _ = store::set_setting(&db, "current", "");
+    broadcast(app, &now);
+}
+
 /// Previous (-1) or next (1) in the list the episode was chosen from.
 #[tauri::command]
 pub fn step(app: AppHandle, core: State<Core>, by: isize) -> R<()> {

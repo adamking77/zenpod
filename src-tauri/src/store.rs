@@ -35,13 +35,22 @@ pub fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
            pieces integer not null default 0, done integer not null default 0,
            error text, created integer not null default (unixepoch()));
          create index if not exists reads_show on reads(show_id, created);
-         create unique index if not exists reads_source on reads(show_id, source_key);",
+         create unique index if not exists reads_source on reads(show_id, source_key);
+         create table if not exists read_seen(show_id integer not null references shows(id) on delete cascade, key text not null,
+           primary key(show_id, key));",
     )?;
     // Shows you make: what kind, where new episodes come from, whether they're read automatically, and their own voice.
     let have: Vec<String> = db.prepare("select name from pragma_table_info('shows')")?.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?;
-    for (col, ty) in [("kind", "text"), ("source", "text"), ("auto", "integer not null default 0"), ("voice", "text")] {
+    for (col, ty) in [("kind", "text"), ("source", "text"), ("auto", "integer not null default 0"), ("voice", "text"), ("problem", "text")] {
         if !have.iter().any(|h| h == col) {
             db.execute_batch(&format!("alter table shows add column {col} {ty}"))?;
+        }
+    }
+    // A post that came as a summary: its page is fetched for the whole text (`link`) before it's read.
+    let have: Vec<String> = db.prepare("select name from pragma_table_info('reads')")?.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?;
+    for (col, ty) in [("link", "text"), ("needs_text", "integer not null default 0"), ("preview", "integer not null default 0")] {
+        if !have.iter().any(|h| h == col) {
+            db.execute_batch(&format!("alter table reads add column {col} {ty}"))?;
         }
     }
     // A reading cut off by quitting carries on from its last finished piece.
@@ -116,6 +125,8 @@ pub struct ShowRow {
     pub source: Option<String>,
     pub auto: bool,
     pub voice: Option<String>,
+    /// Why a feed or folder show couldn't be checked last time.
+    pub problem: Option<String>,
 }
 
 pub fn shows(db: &Connection) -> rusqlite::Result<Vec<ShowRow>> {
@@ -124,7 +135,7 @@ pub fn shows(db: &Connection) -> rusqlite::Result<Vec<ShowRow>> {
            (select count(*) from episodes e where e.show_id = s.id and e.played = 0 and e.position = 0
               and e.published > unixepoch() - 7 * 86400),
            (select max(published) from episodes e where e.show_id = s.id),
-           s.kind, s.source, s.auto, s.voice
+           s.kind, s.source, s.auto, s.voice, s.problem
          from shows s order by s.spotify_only, lower(s.title)",
     )?;
     let rows = st.query_map([], |r| {
@@ -141,6 +152,7 @@ pub fn shows(db: &Connection) -> rusqlite::Result<Vec<ShowRow>> {
             source: r.get(9)?,
             auto: r.get(10)?,
             voice: r.get(11)?,
+            problem: r.get(12)?,
         })
     })?;
     rows.collect()
@@ -432,9 +444,15 @@ pub struct ReadRow {
     pub done: i64,
     pub error: Option<String>,
     pub created: i64,
+    /// The post's page, when the feed only carried a summary.
+    pub link: Option<String>,
+    pub needs_text: bool,
+    /// Only the preview could be had (a paywall).
+    pub preview: bool,
 }
 
-const READ_FROM: &str = "select r.id, r.show_id, s.title, r.episode_id, r.title, r.source, r.chars, r.state, r.pieces, r.done, r.error, r.created
+const READ_FROM: &str = "select r.id, r.show_id, s.title, r.episode_id, r.title, r.source, r.chars, r.state, r.pieces, r.done, r.error, r.created,
+  r.link, r.needs_text, r.preview
   from reads r join shows s on s.id = r.show_id";
 
 fn read_row(r: &rusqlite::Row) -> rusqlite::Result<ReadRow> {
@@ -451,6 +469,9 @@ fn read_row(r: &rusqlite::Row) -> rusqlite::Result<ReadRow> {
         done: r.get(9)?,
         error: r.get(10)?,
         created: r.get(11)?,
+        link: r.get(12)?,
+        needs_text: r.get(13)?,
+        preview: r.get(14)?,
     })
 }
 
@@ -474,7 +495,51 @@ pub fn read(db: &Connection, id: i64) -> rusqlite::Result<Option<ReadRow>> {
 }
 
 pub fn next_queued(db: &Connection) -> rusqlite::Result<Option<ReadRow>> {
-    db.query_row(&format!("{READ_FROM} where r.state = 'queued' order by r.id limit 1"), [], read_row).optional()
+    db.query_row(&format!("{READ_FROM} where r.state = 'queued' and r.needs_text = 0 order by r.id limit 1"), [], read_row).optional()
+}
+
+/// A read from a feed or folder show; none when that post or file is already there.
+#[allow(clippy::too_many_arguments)]
+pub fn add_source_read(db: &Connection, show: i64, title: &str, source: &str, key: &str, chars: i64, state: &str, link: Option<&str>, needs_text: bool) -> rusqlite::Result<Option<i64>> {
+    db.query_row(
+        "insert into reads(show_id, title, source, source_key, chars, state, link, needs_text) values(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         on conflict(show_id, source_key) do nothing returning id",
+        params![show, title, source, key, chars, state, link, needs_text],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
+/// The page's own text arrived (or couldn't be had, and the summary will do).
+pub fn set_read_text(db: &Connection, id: i64, chars: Option<i64>, preview: bool) -> rusqlite::Result<()> {
+    db.execute("update reads set needs_text = 0, preview = ?2, chars = coalesce(?3, chars) where id = ?1", params![id, preview, chars])?;
+    Ok(())
+}
+
+/// Remember a post or file as seen; true the first time.
+pub fn mark_seen(db: &Connection, show: i64, key: &str) -> rusqlite::Result<bool> {
+    Ok(db.execute("insert or ignore into read_seen(show_id, key) values(?1, ?2)", params![show, key])? > 0)
+}
+
+pub fn is_seen(db: &Connection, show: i64, key: &str) -> rusqlite::Result<bool> {
+    db.query_row("select exists(select 1 from read_seen where show_id = ?1 and key = ?2)", params![show, key], |r| r.get(0))
+}
+
+/// Feed and folder shows: (id, kind, source, reads automatically).
+pub fn sources(db: &Connection) -> rusqlite::Result<Vec<(i64, String, String, bool)>> {
+    db.prepare("select id, kind, source, auto from shows where kind in ('feed', 'folder') and source is not null")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+        .collect()
+}
+
+pub fn set_problem(db: &Connection, show: i64, problem: Option<&str>) -> rusqlite::Result<()> {
+    db.execute("update shows set problem = ?2 where id = ?1", params![show, problem])?;
+    Ok(())
+}
+
+/// Switching a show to automatic queues what's waiting.
+pub fn queue_waiting(db: &Connection, show: i64) -> rusqlite::Result<usize> {
+    db.execute("update reads set state = 'queued' where show_id = ?1 and state = 'waiting'", [show])
 }
 
 pub fn set_read_state(db: &Connection, id: i64, state: &str, error: Option<&str>) -> rusqlite::Result<()> {
@@ -566,6 +631,26 @@ mod read_tests {
         assert_eq!(delete_episode(&db, e).unwrap().as_deref(), Some("/tmp/x.m4a"));
         assert!(episode(&db, e).unwrap().is_none());
         assert!(read(&db, r).unwrap().is_none());
+    }
+
+    #[test]
+    fn sources_remember_what_they_have_seen() {
+        let db = mem();
+        let feed = make_show(&db, "Blog", "feed", Some("https://b/feed"), false).unwrap();
+        assert_eq!(sources(&db).unwrap(), vec![(feed, "feed".to_string(), "https://b/feed".to_string(), false)]);
+        assert!(mark_seen(&db, feed, "g1").unwrap());
+        assert!(!mark_seen(&db, feed, "g1").unwrap(), "seen once");
+        assert!(is_seen(&db, feed, "g1").unwrap() && !is_seen(&db, feed, "g2").unwrap());
+
+        let r = add_source_read(&db, feed, "Post", "https://b/1", "g1", 300, "queued", Some("https://b/1"), true).unwrap().unwrap();
+        assert!(next_queued(&db).unwrap().is_none(), "a summary waits for its page");
+        set_read_text(&db, r, Some(9000), false).unwrap();
+        let got = next_queued(&db).unwrap().unwrap();
+        assert_eq!((got.id, got.chars, got.needs_text), (r, 9000, false));
+
+        let w = add_source_read(&db, feed, "Later", "https://b/2", "g2", 300, "waiting", None, false).unwrap().unwrap();
+        assert_eq!(queue_waiting(&db, feed).unwrap(), 1);
+        assert_eq!(read(&db, w).unwrap().unwrap().state, "queued");
     }
 
     #[test]

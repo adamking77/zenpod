@@ -2,8 +2,9 @@
   import { tick } from 'svelte';
   import { open as pick } from '@tauri-apps/plugin-dialog';
   import Art from '$lib/Art.svelte';
+  import { home } from '$lib/home';
   import { ui } from '$lib/ui.svelte';
-  import { mins, readCard, reads, rtm, take, takeFile, voiceLabel, type Read } from '$lib/reads.svelte';
+  import { makeShow, mins, readCard, reads, rtm, take, takeFile, takeSource, voiceLabel, type Read } from '$lib/reads.svelte';
   import { api, type Show } from '$lib/api';
 
   let field = $state<HTMLTextAreaElement>(), entry = $state('');
@@ -15,6 +16,10 @@
   }
   function grow() { if (field) { field.style.height = 'auto'; field.style.height = `${field.scrollHeight}px`; } }
 
+  async function chooseFolder() {
+    const d = await pick({ directory: true, multiple: false, title: 'Make a show from a folder' }).catch(() => null);
+    if (typeof d === 'string') takeSource('folder', d);
+  }
   async function chooseFile() {
     const f = await pick({ multiple: false, title: 'Read to me', filters: [{ name: 'Documents', extensions: ['pdf', 'md', 'markdown', 'txt', 'docx', 'doc', 'rtf', 'html', 'htm'] }] }).catch(() => null);
     if (typeof f === 'string') takeFile(f);
@@ -26,7 +31,7 @@
   function showLine(s: Show) {
     const mine = rtm.reads.filter((r) => r.show_id === s.id);
     const lead = mine.some((r) => r.state === 'reading' || r.state === 'queued') ? 'Reading… · ' : s.fresh ? `${s.fresh} new · ` : '';
-    const src = s.kind === 'feed' || s.kind === 'folder' ? `${s.source} · ${s.auto ? 'read automatically' : 'new posts wait for you'}` : 'Things you add one at a time';
+    const src = s.kind === 'feed' || s.kind === 'folder' ? `${s.kind === 'folder' ? home(s.source ?? '') : (s.source ?? '').replace(/^https?:\/\//, '')} · ${s.auto ? 'read automatically' : `new ${s.kind === 'feed' ? 'posts' : 'files'} wait for you`}` : 'Things you add one at a time';
     return { lead, src };
   }
   // A podcast pasted here is followed the usual way, then shown in Following.
@@ -45,7 +50,7 @@
   {#if !rtm.card}
     <div class="take">
       <textarea bind:this={field} bind:value={entry} rows="1" placeholder="Paste a link, a feed or text" aria-label="A link, a feed or text to read" spellcheck="false" onkeydown={keyed} oninput={grow}></textarea>
-      <span class="ways"><button class="choose" onclick={chooseFile}>Choose file</button><span class="or">or drop one anywhere on the window</span></span>
+      <span class="ways"><button class="choose" onclick={chooseFile}>Choose file</button><button class="choose" onclick={chooseFolder}>Choose folder</button><span class="or">or drop one on the window</span></span>
     </div>
   {:else if rtm.card.kind === 'busy'}
     <p class="quiet busy" aria-live="polite">{rtm.card.what}</p>
@@ -66,12 +71,22 @@
         <button class="cancel" onclick={() => (rtm.card = null)}>Cancel</button>
       </span>
     </div>
-  {:else if rtm.card.kind === 'feed'}
+  {:else if rtm.card.kind === 'feed' || rtm.card.kind === 'folder'}
+    {@const c = rtm.card}
+    {@const word = c.kind === 'feed' ? 'posts' : 'files'}
     <div class="check">
-      <span class="k">A feed of articles</span>
-      <span class="name">{rtm.card.name}</span>
-      <p class="lede">Feeds become shows of their own in the next update. For now, paste a single article's address.</p>
-      <span class="go"><button class="cancel" onclick={() => (rtm.card = null)}>Cancel</button></span>
+      <span class="k">{c.kind === 'feed' ? 'A feed of articles' : 'A folder'}</span>
+      <input class="name" bind:value={c.name} aria-label="Show name" spellcheck="false" onkeydown={(e) => e.key === 'Enter' && makeShow()} />
+      <span class="from">{c.kind === 'folder' ? home(c.source) : c.source.replace(/^https?:\/\//, '')}</span>
+      <span class="size">{c.items.length} recent {word}{c.count > c.items.length ? ` of ${c.count}` : ''}</span>
+      <ul class="posts">{#each c.items as t}<li>{t}</li>{/each}</ul>
+      <span class="to">New {word}</span>
+      <span class="words">
+        <button aria-pressed={!c.auto} onclick={() => (c.auto = false)}>Wait for me</button>
+        <button aria-pressed={c.auto} onclick={() => (c.auto = true)}>Read them automatically</button>
+      </span>
+      <span class="by">Read by {voiceLabel()} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
+      <span class="go"><button class="read" onclick={makeShow}>Make it a show</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
     </div>
   {:else if rtm.card.kind === 'item'}
     {@const c = rtm.card}
@@ -129,7 +144,15 @@
   .show-p { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin: 0 0 14px; max-width: 38ch; }
   .take { display: grid; gap: 10px; margin: 6px 0 22px; }
   .ways { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .ways { gap: 14px; }
   .or { font-size: 12.5px; color: var(--text-faint); }
+  .posts { list-style: none; margin: 2px 0; padding: 0; display: grid; gap: 4px; }
+  .posts li { font-size: 13px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .posts li::before { content: '·'; color: var(--text-faint); margin-right: 8px; }
+  .words { display: flex; gap: 14px; flex-wrap: wrap; margin-top: -2px; }
+  .words button { font-size: 13.5px; color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }
+  .words button:hover { color: var(--text-dim); }
+  .words button[aria-pressed="true"] { color: var(--text); }
   textarea { all: unset; box-sizing: border-box; flex: 1; min-width: 0; font: 400 13.5px/1.45 var(--font-ui); color: var(--text); border-bottom: 1px solid var(--line);
     padding: 4px 0 6px; resize: none; max-height: 120px; overflow-y: auto; scrollbar-width: none; white-space: pre-wrap; overflow-wrap: anywhere; caret-color: var(--accent);
     transition: border-color var(--dur-base) var(--ease-hover); }

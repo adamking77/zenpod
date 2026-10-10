@@ -5,6 +5,7 @@ mod peaks;
 mod play;
 mod proto;
 mod read;
+mod sources;
 mod store;
 mod voice;
 
@@ -116,6 +117,8 @@ async fn refresh(app: AppHandle) -> R<usize> {
     .filter(|ok| *ok)
     .count();
     library_changed(&app);
+    // Feed and folder shows of yours are checked with the podcasts.
+    sources::check(&app).await;
     Ok(ok)
 }
 
@@ -510,9 +513,54 @@ fn discard_read(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
 
 #[tauri::command]
 fn set_show(app: AppHandle, core: State<Core>, id: i64, title: Option<String>, auto: Option<bool>, voice: Option<String>) -> R<()> {
-    store::set_show(&core.db.lock().unwrap(), id, title.as_deref().map(str::trim).filter(|t| !t.is_empty()), auto, voice.as_deref()).map_err(err)?;
+    let db = core.db.lock().unwrap();
+    store::set_show(&db, id, title.as_deref().map(str::trim).filter(|t| !t.is_empty()), auto, voice.as_deref()).map_err(err)?;
+    // Switching to automatic reads what's waiting.
+    if auto == Some(true) && store::queue_waiting(&db, id).map_err(err)? > 0 {
+        read::wake();
+        let _ = app.emit("reads", ());
+    }
+    drop(db);
     library_changed(&app);
     Ok(())
+}
+
+/// What a feed or folder holds, for the card: its name, its newest titles, and how many.
+#[tauri::command]
+async fn preview_source(kind: String, source: String) -> R<sources::Preview> {
+    sources::preview(&kind, source.trim()).await
+}
+
+#[tauri::command]
+async fn make_source_show(app: AppHandle, kind: String, source: String, name: String, auto: bool) -> R<i64> {
+    if kind != "feed" && kind != "folder" {
+        return Err("Only a feed or a folder can become a show.".into());
+    }
+    let name = if name.trim().is_empty() { "New show".to_string() } else { name.trim().to_string() };
+    let source = source.trim();
+    let source = if kind == "folder" && source.len() > 1 { source.trim_end_matches('/') } else { source };
+    sources::make(&app, &kind, source, &name, auto).await
+}
+
+/// A summary-only post's page, read by the window (Readability); none when only the preview could be had.
+#[tauri::command]
+fn set_read_text(app: AppHandle, core: State<Core>, id: i64, text: Option<String>, preview: bool) -> R<()> {
+    let chars = match text.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        Some(t) => {
+            std::fs::write(read::dir(&app).join(format!("{id}.txt")), t).map_err(err)?;
+            Some(t.chars().count() as i64)
+        }
+        None => None,
+    };
+    store::set_read_text(&core.db.lock().unwrap(), id, chars, preview).map_err(err)?;
+    read::wake();
+    let _ = app.emit("reads", ());
+    Ok(())
+}
+
+#[tauri::command]
+fn is_folder(path: String) -> bool {
+    std::path::Path::new(&path).is_dir()
 }
 
 fn forget_episode_files(app: &AppHandle, episode: i64) {
@@ -531,6 +579,7 @@ fn remove_show(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
         (store::show_episode_ids(&db, id).map_err(err)?, store::show_read_ids(&db, id).map_err(err)?)
     };
     for e in episodes {
+        play::forget(&app, e);
         forget_episode_files(&app, e);
     }
     let d = read::dir(&app);
@@ -545,6 +594,7 @@ fn remove_show(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
 /// Delete one episode of yours: its audio, transcript and chapters go with it.
 #[tauri::command]
 fn delete_episode(app: AppHandle, core: State<Core>, id: i64) -> R<()> {
+    play::forget(&app, id);
     let path = store::delete_episode(&core.db.lock().unwrap(), id).map_err(err)?;
     if let Some(p) = path {
         let _ = std::fs::remove_file(p);
@@ -693,7 +743,8 @@ pub fn run() {
             modes::set_mode, modes::pill_panel, modes::drag_panel, proto::warm,
             add_mark, set_mark_note, remove_mark, marks, all_marks, notes_file, set_notes_folder,
             voice_services, set_voice_key, mac_voices, voice_sample, fetch_page, read_file, read_to_me, add_read, reads,
-            read_now, stop_read, discard_read, set_show, remove_show, delete_episode, take_incoming
+            read_now, stop_read, discard_read, set_show, remove_show, delete_episode, take_incoming,
+            preview_source, make_source_show, set_read_text, is_folder
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

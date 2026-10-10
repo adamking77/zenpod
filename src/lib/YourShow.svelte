@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { listen } from '@tauri-apps/api/event';
   import Art from '$lib/Art.svelte';
+  import { home } from '$lib/home';
   import { api, length, type Episode } from '$lib/api';
   import { ui } from '$lib/ui.svelte';
   import { mins, reads, rtm, voiceLabel } from '$lib/reads.svelte';
@@ -27,7 +28,7 @@
     if (to === 'following') ui.tab = 'following';
   }
   const source = $derived(
-    show?.kind === 'feed' ? `New posts from ${show.source}` : show?.kind === 'folder' ? `New files in ${show.source}`
+    show?.kind === 'feed' ? `New posts from ${(show.source ?? '').replace(/^https?:\/\//, '')}` : show?.kind === 'folder' ? `New files in ${home(show.source ?? '')}`
       : 'Things you add one at a time, from Read to me or by dropping them on the window.');
   const voices = $derived([['', `Your default (${voiceLabel()})`], ...rtm.mac.map((v) => [`mac:${v.name}`, v.name])]);
 
@@ -44,6 +45,7 @@
     <span class="show-art"><Art id={show.id} kind={show.kind} name={show.title} size={88} /></span>
     <h2 class="show-h">{show.title}</h2>
     <p class="show-p">{source}</p>
+    {#if show.problem}<p class="show-p problem">{show.problem}</p>{/if}
     <div class="opts">
       {#if show.kind === 'feed' || show.kind === 'folder'}
         <span class="l">New {show.kind === 'feed' ? 'posts' : 'files'}</span>
@@ -92,8 +94,9 @@
   .show-art { display: block; margin: 4px 0 16px; }
   .show-art :global(.art) { border-radius: 9px; }
   .show-h { font-weight: 250; font-size: 24px; line-height: 1.2; margin: 0 0 8px; }
+  .show-p.problem { color: var(--failed); margin-top: -8px; }
   .show-p { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin: 0 0 14px; max-width: 38ch; overflow-wrap: anywhere; }
-  .opts { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px 14px; align-items: baseline; margin: 4px 0 18px; font-size: 13.5px; }
+  .opts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; align-items: baseline; margin: 4px 0 18px; font-size: 13.5px; }
   .l { color: var(--text-faint); font-size: 12.5px; }
   .words { display: flex; gap: 14px; flex-wrap: wrap; }
   .words button { font-size: 13.5px; color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }

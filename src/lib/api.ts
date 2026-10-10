@@ -5,6 +5,8 @@ export type Show = {
   image_url: string | null; spotify_only: boolean; fresh: number; latest: number | null;
   /** Set for a show you made: 'read-to-me', 'items', 'feed' or 'folder'. */
   kind: string | null; source: string | null; auto: boolean; voice: string | null;
+  /** Why a feed or folder show couldn't be checked last time. */
+  problem: string | null;
 };
 
 export type Episode = {

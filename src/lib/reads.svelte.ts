@@ -1,13 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { api, type Show } from '$lib/api';
-import { fromHtml, fromText, host, isLink } from '$lib/extract';
+import { feedLink, fromHtml, fromText, host, isLink } from '$lib/extract';
 import { prefs } from '$lib/prefs.svelte';
 import { ui } from '$lib/ui.svelte';
 
 export type Read = {
   id: number; show_id: number; show_title: string; episode_id: number | null; title: string; source: string;
   chars: number; state: 'waiting' | 'queued' | 'reading' | 'failed' | 'done'; pieces: number; done: number; error: string | null; created: number;
+  link: string | null; needs_text: boolean; preview: boolean;
 };
 export type ServiceInfo = { id: string; name: string; model: string; voice: string; keyed: boolean };
 export type MacVoice = { name: string; locale: string };
@@ -18,7 +19,7 @@ export type Card =
   | { kind: 'error'; message: string }
   | { kind: 'item'; title: string; from: string; source: string; text: string; to: number | 'new'; newName: string }
   | { kind: 'podcast'; name: string; url: string }
-  | { kind: 'feed'; name: string; url: string };
+  | { kind: 'feed' | 'folder'; name: string; source: string; items: string[]; count: number; auto: boolean };
 
 export const rtm = $state({
   reads: [] as Read[],
@@ -46,8 +47,8 @@ export async function loadVoices() {
 }
 
 export function followReads() {
-  loadReads();
-  const a = listen('reads', loadReads), b = listen('library', loadReads);
+  const a = listen('reads', () => loadReads().then(fetchWhole)), b = listen('library', loadReads);
+  loadReads().then(fetchWhole);
   // Files opened with Zenpod and zenpod://read links, including any that arrived before this window loaded.
   const c = listen('incoming', takeIncoming);
   takeIncoming();
@@ -92,8 +93,11 @@ export async function take(input: string, into?: string | null) {
     const page = await invoke<{ url: string; kind: 'page' | 'podcast' | 'feed'; html: string; title: string | null }>('fetch_page', { url: v });
     if (rtm.card?.kind !== 'busy') return; // cancelled meanwhile
     if (page.kind === 'podcast') { rtm.card = { kind: 'podcast', name: page.title ?? host(page.url), url: v }; return; }
-    if (page.kind === 'feed') { rtm.card = { kind: 'feed', name: page.title ?? host(page.url), url: v }; return; }
-    const d = fromHtml(page.html, page.url);
+    if (page.kind === 'feed') { await takeSource('feed', page.url); return; }
+    // A blog's front page, or a page with no article but a feed: the feed becomes a show.
+    const feed = feedLink(page.html, page.url), front = new URL(page.url).pathname.replace(/\/$/, '') === '';
+    const d = front && feed ? null : fromHtml(page.html, page.url);
+    if (!d && feed) { await takeSource('feed', feed); return; }
     rtm.card = d
       ? { kind: 'item', title: d.title, from: `${host(page.url)} · article`, source: page.url, text: d.text, to, newName: '' }
       : { kind: 'error', message: 'There’s no article text on that page.' };
@@ -102,8 +106,56 @@ export async function take(input: string, into?: string | null) {
   }
 }
 
-/** A file from Choose file, a drop, the Dock or Open With. */
+/** A feed or a folder: what it holds now, for the card that makes it a show. */
+export async function takeSource(kind: 'feed' | 'folder', source: string, name?: string) {
+  openRead();
+  rtm.card = { kind: 'busy', what: kind === 'feed' ? `Reading the feed…` : `Looking in ${source.split('/').pop()}…` };
+  try {
+    const p = await invoke<{ name: string; items: string[]; count: number }>('preview_source', { kind, source });
+    if (rtm.card?.kind !== 'busy') return;
+    if (!p.count) { rtm.card = { kind: 'error', message: kind === 'feed' ? 'That feed has no posts yet.' : 'There’s nothing Zenpod can read in that folder.' }; return; }
+    rtm.card = { kind, name: name || p.name, source, items: p.items, count: p.count, auto: false };
+  } catch (e) {
+    if (rtm.card?.kind === 'busy') rtm.card = { kind: 'error', message: String(e) };
+  }
+}
+
+/** Make it a show: it opens on its own page. */
+export async function makeShow() {
+  const c = rtm.card;
+  if (c?.kind !== 'feed' && c?.kind !== 'folder') return;
+  rtm.card = { kind: 'busy', what: 'Making the show…' };
+  try {
+    const id = await invoke<number>('make_source_show', { kind: c.kind, source: c.source, name: c.name, auto: c.auto });
+    await loadReads();
+    rtm.card = null;
+    ui.yours = { id, back: 'read' };
+  } catch (e) { rtm.card = { kind: 'error', message: String(e) }; }
+}
+
+// A feed that only carries summaries: each post's page is read here, as an article is, before the post is read aloud.
+const fetching = new Set<number>();
+async function fetchWhole() {
+  for (const r of rtm.reads.filter((x) => x.needs_text && x.link && !fetching.has(x.id))) {
+    fetching.add(r.id);
+    let text: string | null = null, preview = true;
+    try {
+      const page = await invoke<{ url: string; kind: string; html: string }>('fetch_page', { url: r.link });
+      const d = page.kind === 'page' ? fromHtml(page.html, page.url) : null;
+      if (d && d.text.length > r.chars) {
+        text = d.text;
+        // Short, and the page asks you to subscribe or sign in: a paywall let only the start through.
+        preview = d.text.length < 1500 && /subscribe|sign in|log in|paid subscribers/i.test(page.html);
+      }
+    } catch { /* the summary will do */ }
+    await invoke('set_read_text', { id: r.id, text, preview }).catch(() => {});
+    fetching.delete(r.id);
+  }
+}
+
+/** A file from Choose file, a drop, the Dock or Open With. A folder becomes a show of its own. */
 export async function takeFile(path: string) {
+  if (await invoke<boolean>('is_folder', { path })) return takeSource('folder', path);
   openRead();
   const name = path.split('/').pop() ?? path;
   rtm.card = { kind: 'busy', what: `Opening ${name}…` };

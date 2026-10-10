@@ -132,7 +132,8 @@ async fn run(app: &AppHandle, r: &store::ReadRow) -> Result<(), String> {
         return Ok(());
     }
     let first = text.split("\n\n").map(str::trim).find(|b| !b.is_empty() && !b.starts_with("# ")).unwrap_or("");
-    let description = format!("<p>From {}</p><p>{}</p>", source_html(&r.source), esc(&first.chars().take(600).collect::<String>()));
+    let preview = if r.preview { "<p>Only the preview was available.</p>" } else { "" };
+    let description = format!("<p>From {}</p>{preview}<p>{}</p>", source_html(&r.source), esc(&first.chars().take(600).collect::<String>()));
     let episode = store::finish_read(&db, &store::Made {
         show: r.show_id,
         read: r.id,

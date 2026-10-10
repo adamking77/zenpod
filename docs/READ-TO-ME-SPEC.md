@@ -398,3 +398,27 @@ One line: what happened, and what to do.
 - Prices and usage tracking.
 - Re-reading a file or post that changed after it was read.
 - Sharing your shows as a public feed.
+
+## 15 · As built
+
+Built on `feat/read-to-me` on 10 October 2026, both milestones together. Where the build differs from the sections above, this list wins.
+
+- **The pane's field** sits alone on its line; Choose file and Choose folder are words beneath it, with "or drop one on the window". At the library's default width the old layout cut the placeholder off.
+- **Read to me** is stored with `kind = 'read-to-me'` (not `items`), so the code can tell it from a show you named. It's made the first time the pane loads.
+- **A show's own voice** is the default or one of this Mac's voices. A different service per show isn't offered.
+- **A blog's front page** works as well as its feed address: when a page links to its feed (`<link rel="alternate">`) and is the site's front page or has no article, Zenpod offers the feed as a show.
+- **Summary-only posts** are fetched as pages by the window, with the same Readability as a pasted link, before they're read. A reading waits for this (`needs_text`) and is never sent to a service with only the summary unless the page couldn't be had.
+- **What a feed or folder already held** is remembered in `read_seen`, so it's never offered again; the 3 newest arrive, oldest first.
+- **Deleting the episode that's loaded** empties the player ("The room is quiet").
+- **Audio** is saved as AAC at the encoder's best variable quality (`afconvert -q 127 -s 3`); a fixed 96 kbps isn't accepted for 22 kHz mono.
+- **Errors in Settings** say "Paste it above" or "Check it above" instead of pointing to Settings.
+
+### Checked
+
+- 30 Rust tests, including a real `say` → join → `afconvert` → decode round trip, feed parsing (RSS and Atom), folder listing, piece splitting, transcript and chapter timing, and the store's rules (your shows never refreshed as podcasts, a source read once, a podcast episode can't be deleted as yours). The refresh-filter test was mutation-checked.
+- In the app, with this Mac's voice: a Markdown file opened with Zenpod (two chapters, transcript, 18.47 s matching the audio), an article by `zenpod://read` (Founder Mode, 3 pieces, 5½ min, 74 cues), a blog's front page found as a feed and made a show, one post read, a folder made a show reading automatically, a new file in it read on the next refresh, Remove this show, Delete, and deleting the loaded episode.
+
+### Not yet checked
+
+- **Services with a real key.** Each adapter follows its provider's API reference (section 7), and a missing key gives the right message, but none has been called with a key. Play a sample against each one you have settles it, along with the Inworld and ElevenLabs default voices and the Gemini model name.
+- **Dropping on the Dock icon.** Open With was checked; a drop on the Dock icon uses the same path.

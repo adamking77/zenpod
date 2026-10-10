@@ -44,6 +44,14 @@ export function fromText(raw: string): Doc {
   return { title: first.length > 90 ? `${first.slice(0, 88).trimEnd()}…` : first, text: paras.join('\n\n') };
 }
 
+/** The feed a page points to, if it has one (<link rel="alternate" type="application/rss+xml">). */
+export function feedLink(html: string, url: string): string | null {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const l = doc.querySelector('link[rel~="alternate"][type*="rss" i], link[rel~="alternate"][type*="atom" i]');
+  const href = l?.getAttribute('href');
+  try { return href ? new URL(href, url).href : null; } catch { return null; }
+}
+
 export const isLink = (s: string) => /^https?:\/\/\S+$/i.test(s.trim());
 
 export const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
