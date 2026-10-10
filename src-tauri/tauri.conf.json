@@ -51,7 +51,25 @@
     "macOS": {
       "signingIdentity": "-",
       "minimumSystemVersion": "13.0"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "txt",
+          "pdf",
+          "docx",
+          "doc",
+          "rtf",
+          "html",
+          "htm"
+        ],
+        "name": "Document",
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
+    ]
   },
   "plugins": {
     "deep-link": {

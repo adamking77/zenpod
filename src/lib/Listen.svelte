@@ -9,6 +9,7 @@
   import { plate, plateApi } from '$lib/marks.svelte';
   import { castFrom } from '$lib/cast';
   import { I } from '$lib/icons';
+  import Art from '$lib/Art.svelte';
 
   const MODES = ['field', 'thread', 'orbit'] as const;
   type Mode = (typeof MODES)[number];
@@ -37,7 +38,7 @@
   {#if now.episode}
     {@const e = now.episode}
     <div class="now">
-      <button class="cover" aria-label="Open {e.show_title}" onclick={() => (ui.showing = e.show_id)}><img src="listener://localhost/art/{e.show_id}" alt="" /></button>
+      <button class="cover" aria-label="Open {e.show_title}" onclick={() => (ui.showing = e.show_id)}>{#if e.show_kind}<Art id={e.show_id} kind={e.show_kind} page={e.title} />{:else}<img src="listener://localhost/art/{e.show_id}" alt="" />{/if}</button>
       <div class="who">
         <button class="title" aria-pressed={ui.notes} onclick={() => (ui.notes = !ui.notes)} title="Show notes">{e.title}</button>
         <span class="sub"><button class="show" onclick={() => (ui.showing = e.show_id)}>{e.show_title}</button>{#if chapter?.title} · {chapter.title}{/if}</span>
@@ -77,8 +78,8 @@
       {#if ui.empty}
         <p class="sub">Bring your shows in to begin.</p>
         <span class="ways">
-          <button onclick={() => { ui.notes = false; ui.tab = 'settings'; }}>Bring my list</button>
-          <button onclick={() => { ui.notes = false; ui.tab = 'settings'; ui.paste = true; }}>Paste an address</button>
+          <button onclick={() => { ui.notes = false; ui.yours = null; ui.tab = 'settings'; }}>Bring my list</button>
+          <button onclick={() => { ui.notes = false; ui.yours = null; ui.tab = 'settings'; ui.paste = true; }}>Paste an address</button>
         </span>
       {:else}
         <p class="sub">Choose an episode on the right.</p>
@@ -94,6 +95,7 @@
   .show { color: inherit; font: inherit; text-align: left; transition: color var(--dur-base) var(--ease-hover); }
   @media (hover: hover) and (pointer: fine) { .show:hover { color: var(--text); } }
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .cover :global(.art) { width: 100%; height: 100%; border-radius: 0; }
   .who { min-width: 0; }
   .title { width: 100%; text-align: left; max-width: 22ch; font-weight: 250; font-size: 28px; line-height: 1.18; letter-spacing: -0.012em; margin: 0 0 4px; text-wrap: balance;
     display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

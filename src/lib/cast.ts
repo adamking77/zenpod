@@ -17,5 +17,7 @@ export function castFrom(show: number) {
     document.documentElement.style.setProperty('--cast',
       colourful ? `hsl(from rgb(${r / wt} ${gr / wt} ${b / wt}) h clamp(25, s, 60) 60)` : '#6f8fc9');
   };
+  // A show you made has no artwork: the neutral light.
+  img.onerror = () => document.documentElement.style.setProperty('--cast', '#6f8fc9');
   img.src = `listener://localhost/art/${show}`;
 }

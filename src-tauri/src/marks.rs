@@ -110,7 +110,7 @@ mod tests {
     fn ep() -> EpisodeRow {
         EpisodeRow {
             id: 7, show_id: 1, show_title: "What Works".into(), title: "We're Not Late (Or, Rethinking the Long-Term)".into(),
-            published: Some(1_717_459_200), duration: Some(1233.0), position: 0.0, played: false, kept: false, offline: false, image_url: None,
+            published: Some(1_717_459_200), duration: Some(1233.0), position: 0.0, played: false, kept: false, offline: false, image_url: None, show_kind: None,
         }
     }
     fn mark(start: f64, note: &str, quote: Option<&str>) -> MarkRow {

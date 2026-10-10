@@ -3,6 +3,10 @@
   import { listen } from '@tauri-apps/api/event';
   import { api, length, plain, short, type Episode, type Show } from '$lib/api';
   import Settings from '$lib/Settings.svelte';
+  import ReadToMe from '$lib/ReadToMe.svelte';
+  import YourShow from '$lib/YourShow.svelte';
+  import Art from '$lib/Art.svelte';
+  import { openRead, reads, rtm } from '$lib/reads.svelte';
   import NotesList from '$lib/NotesList.svelte';
   import NotesTab from '$lib/NotesTab.svelte';
   import { marks } from '$lib/marks.svelte';
@@ -89,7 +93,9 @@
   const following = $derived.by(() => {
     const order = by[prefs.sort];
     const arrived = (s: Show) => Number(ui.arrived?.ids.includes(s.id) ?? false);
-    return [...shows].sort((a, b) => arrived(b) - arrived(a) || Number(a.spotify_only) - Number(b.spotify_only) || (order?.(a, b) ?? 0));
+    // Your shows sit among the podcasts; Read to me only once it has something in it.
+    return [...shows].filter((s) => s.kind !== 'read-to-me' || s.latest != null)
+      .sort((a, b) => arrived(b) - arrived(a) || Number(a.spotify_only) - Number(b.spotify_only) || (order?.(a, b) ?? 0));
   });
 
   async function load() {
@@ -112,7 +118,7 @@
     return () => { un.then((f) => f()); up.then((f) => f()); sn.then((f) => f()); };
   });
 
-  let feedFix = $state(''), fixNote = $state(''), confirming = $state(false);
+  let feedFix = $state(''), fixNote = $state(''), confirming = $state(false), deleting = $state<number | null>(null);
 
   async function fix(ev: SubmitEvent) {
     ev.preventDefault();
@@ -141,7 +147,21 @@
     if (s) { ui.showing = null; ui.notes = false; ui.arrived = null; ui.tab = 'following'; drill(s); }
   });
 
+  // Tabs are places; Settings and Read to me are panes over them, and their icons close them again.
+  function tab(t: 'new' | 'following' | 'notes') { ui.tab = t; ui.last = t; open = null; ui.notes = false; ui.arrived = null; ui.yours = null; }
+  function pane(p: 'settings' | 'read') {
+    if (ui.tab === p && !ui.notes && !ui.yours) { ui.tab = ui.last; return; }
+    if (p === 'read') openRead(); else { ui.tab = 'settings'; ui.notes = false; ui.yours = null; }
+    ui.arrived = null;
+  }
+  const tabOn = (t: string) => !ui.notes && !ui.yours && ui.tab === t;
+  // The icon's dot: something is being read, a feed or folder show has posts waiting for you, or a new episode of
+  // yours hasn't been played.
+  const lit = $derived(rtm.reads.some((r) => r.state === 'reading' || r.state === 'queued' || r.state === 'waiting') || rtm.shows.some((s) => s.fresh > 0));
+  const yours = (s: Show) => s.kind != null;
+
   async function drill(s: Show | null) {
+    if (s && yours(s)) { ui.yours = { id: s.id, back: 'following' }; return; }
     added = null;
     confirming = false; fixNote = ''; feedFix = '';
     open = s;
@@ -181,24 +201,28 @@
 
 {#snippet row(e: Episode, list: Episode[], withCover: boolean, meta: string)}
   <button class="row" class:plain={!withCover} class:heard={e.played} class:playing={e.id === current} onclick={() => onplay(e, list)} onpointerenter={() => warm(e.id)} onfocus={() => warm(e.id)}>
-    {#if withCover}{@render cover(e.image_url, 34)}{/if}
+    {#if withCover}{#if e.show_kind}<Art id={e.show_id} kind={e.show_kind} page={e.title} size={34} />{:else}{@render cover(e.image_url, 34)}{/if}{/if}
     <span class="txt"><span class="t">{e.title}</span><span class="m"><span class="sub">{meta}</span> <span class="num">{length(e)}</span></span></span>
   </button>
 {/snippet}
 
-<section class="lib" aria-label="Library">
-  <div class="lib-h">
-    <span class="tabs" role="group" aria-label="Library">
-      <button aria-pressed={!ui.notes && ui.tab === 'new'} onclick={() => { ui.tab = 'new'; open = null; ui.notes = false; ui.arrived = null; }}>New</button>
-      <button aria-pressed={!ui.notes && ui.tab === 'following'} onclick={() => { ui.tab = 'following'; open = null; ui.notes = false; ui.arrived = null; }}>Following</button>
-      <button aria-pressed={!ui.notes && ui.tab === 'notes'} onclick={() => { ui.tab = 'notes'; open = null; ui.notes = false; ui.arrived = null; }}>Notes</button>
-    </span>
+<section class="lib" class:drop={ui.dropping} aria-label="Library">
+  <!-- The icons keep the top row; the tabs sit on their own row beneath. -->
+  <div class="lib-h icons">
     <span class="modes">
+      <button class="rtm-i" aria-label="Read to me" title="Read to me (R)" aria-pressed={tabOn('read') || ui.yours != null} onclick={() => pane('read')}>{@html I.read}{#if lit}<i class="dot"></i>{/if}</button>
       <button aria-label="Mini player" onclick={() => goTo('mini')}>{@html I.mini}</button>
       <button aria-label="Pill" onclick={() => goTo('pill')}>{@html I.pill}</button>
-      <button aria-label="Settings" aria-pressed={!ui.notes && ui.tab === 'settings'} onclick={() => { ui.tab = 'settings'; ui.notes = false; ui.arrived = null; }}>
+      <button aria-label="Settings" aria-pressed={tabOn('settings')} onclick={() => pane('settings')}>
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
       </button>
+    </span>
+  </div>
+  <div class="lib-h">
+    <span class="tabs" role="group" aria-label="Library">
+      <button aria-pressed={tabOn('new')} onclick={() => tab('new')}>New</button>
+      <button aria-pressed={tabOn('following')} onclick={() => tab('following')}>Following</button>
+      <button aria-pressed={tabOn('notes')} onclick={() => tab('notes')}>Notes</button>
     </span>
   </div>
   <div class="list" bind:this={list}>
@@ -206,9 +230,16 @@
       <button class="back" onclick={() => (ui.notes = false)}>← back</button>
       <h2 class="show-h">{now.episode.title}</h2>
       <p class="show-p sub">{now.episode.show_title} · {date(now.episode.published)}</p>
-      <button class="keep" aria-pressed={now.episode.kept} onclick={() => { const e = now.episode!; api.keep(e.id, !e.kept); e.kept = !e.kept; }}>
-        {now.episode.kept ? 'Kept offline · let it go' : 'Keep offline'}
-      </button>
+      {#if !now.episode.show_kind}
+        <button class="keep" aria-pressed={now.episode.kept} onclick={() => { const e = now.episode!; api.keep(e.id, !e.kept); e.kept = !e.kept; }}>
+          {now.episode.kept ? 'Kept offline · let it go' : 'Keep offline'}
+        </button>
+      {:else}
+        <!-- An episode you made lives only here, so deleting it asks twice, the way Stop following does. -->
+        <button class="leave del" onclick={() => { if (deleting === now.episode?.id) reads.deleteEpisode(now.episode.id); else deleting = now.episode?.id ?? null; }}>
+          {deleting === now.episode.id ? 'Press again to delete it' : 'Delete this episode'}
+        </button>
+      {/if}
       {#if chapters.list.length}
         <ol class="chapters">
           {#each chapters.list as c}
@@ -232,6 +263,10 @@
           <p class="note" data-no-drag>{#each n as b}{#if b.href}<a href={b.href} onclick={(e) => { e.preventDefault(); openUrl(b.href!); }}>{b.text}</a>{:else}{b.text}{/if}{/each}</p>
         {:else}<p class="quiet">This episode came without notes.</p>{/each}
       {/if}
+    {:else if ui.yours}
+      <YourShow id={ui.yours.id} {current} {onplay} />
+    {:else if ui.tab === 'read'}
+      <ReadToMe />
     {:else if ui.tab === 'settings'}
       <Settings />
     {:else if ui.tab === 'notes'}
@@ -279,10 +314,10 @@
       {/if}
       {#each following as s (s.id)}
         <button class="row show" class:arrive={ui.arrived?.ids.includes(s.id)} onclick={() => drill(s)}>
-          {@render cover(s.image_url, 40)}
+          {#if yours(s)}<Art id={s.id} kind={s.kind} name={s.title} size={40} />{:else}{@render cover(s.image_url, 40)}{/if}
           <span class="txt"><span class="t">{s.title}</span>
             <span class="m sub">
-              {#if ui.arrived?.ids.includes(s.id)}<span class="new">Just added</span> · {/if}{#if s.spotify_only}Only on Spotify{:else}{#if s.fresh}<span class="new">{s.fresh} new</span> · {/if}{s.author ?? ''}{/if}
+              {#if ui.arrived?.ids.includes(s.id)}<span class="new">Just added</span> · {/if}{#if s.spotify_only}Only on Spotify{:else}{#if s.fresh}<span class="new">{s.fresh} new</span> · {/if}{yours(s) ? 'Your show' : (s.author ?? '')}{/if}
             </span></span>
         </button>
       {:else}
@@ -290,11 +325,25 @@
       {/each}
     {/if}
   </div>
+  <div class="dropnote" aria-hidden="true"><b>Drop to hear it</b><span>It goes to Read to me</span></div>
 </section>
 
 <style>
-  .lib { border-left: 1px solid var(--hair); padding: 12px 22px 20px 32px; display: grid; grid-template-rows: 36px 1fr; min-height: 0; position: relative; z-index: 2; }
+  .lib { border-left: 1px solid var(--hair); padding: 10px 22px 20px 32px; display: grid; grid-template-rows: 28px 34px 1fr; min-height: 0; position: relative; z-index: 2;
+    transition: box-shadow var(--dur-pane) var(--ease), background-color var(--dur-pane) var(--ease); }
   .lib-h { display: flex; justify-content: space-between; align-items: center; }
+  .lib-h.icons { justify-content: flex-end; }
+  .rtm-i { position: relative; }
+  .dot { position: absolute; top: 2px; right: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--ground); }
+  /* something dragged over the window: the library's edge takes the accent, its list steps back, and says where it goes */
+  .lib.drop { box-shadow: inset 2px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .list { transition: opacity var(--dur-pane) var(--ease), filter var(--dur-pane) var(--ease); }
+  .lib.drop .list { opacity: 0.08; filter: blur(1.5px); }
+  .dropnote { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; text-align: center; pointer-events: none;
+    opacity: 0; transform: translateY(4px); transition: opacity var(--dur-pane) var(--ease), transform var(--dur-pane) var(--ease); }
+  .dropnote b { font-weight: 250; font-size: 22px; color: var(--text); }
+  .dropnote span { font-size: 13px; color: var(--text-dim); }
+  .lib.drop .dropnote { opacity: 1; transform: none; }
   .tabs { display: flex; gap: 20px; align-items: baseline; }
   .tabs button { font-size: 14.5px; color: var(--text-faint); transition: color 0.14s ease; }
   .tabs button[aria-pressed="true"] { color: var(--text); }

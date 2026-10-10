@@ -33,6 +33,7 @@ The Mini and the Pill float above other windows. They never take focus from the 
 - Follows shows by feed address or by name, and checks them hourly.
 - Imports your shows from an OPML file (Overcast, Pocket Casts and most other apps) or from your Spotify data export.
 - Press M to keep the last 30 seconds as a note, and write beside it on the shape. Notes are listed per episode and in a Notes tab, and can be written to a folder as Markdown, where each note's time opens Zenpod at that moment. Notes can be written in the Mini too.
+- Read to me makes your own shows from what you read. Paste a link or text, drop a file (PDF, Markdown, Word, text, HTML), or turn a blog's feed or a folder into a show that keeps getting new episodes. Each becomes an episode with its shape, a transcript and chapters, read by a voice on your Mac, a model you run yourself, or a service with your own key (OpenAI, Gemini, Grok, MiniMax, Inworld, ElevenLabs). Keys stay in the Keychain.
 - Opens an episode's show notes beside the player, with links you can follow.
 - Shows chapters and transcripts when the feed has them.
 - Keeps episodes for offline listening.

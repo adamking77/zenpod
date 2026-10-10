@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Art from '$lib/Art.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { onMount } from 'svelte';
@@ -21,7 +22,7 @@
   <div class="pill">
     <span class="po">
       {#if !open}<Signal variant="pill" />{/if}
-      {#if now.episode}<span class="disc"><img src="listener://localhost/art/{now.episode.show_id}" alt="" /></span>{/if}
+      {#if now.episode}<span class="disc">{#if now.episode.show_kind}<Art id={now.episode.show_id} kind={now.episode.show_kind} name={now.episode.show_title} round />{:else}<img src="listener://localhost/art/{now.episode.show_id}" alt="" />{/if}</span>{/if}
     </span>
     <button class="who" data-drag aria-label="Open the pill panel" aria-expanded={open} onclick={() => invoke('pill_panel', { open: !open })}>
       <span class="t">{now.episode?.title ?? 'The room is quiet.'}</span>

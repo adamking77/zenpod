@@ -187,6 +187,24 @@ fn start(app: &AppHandle, db: &rusqlite::Connection, now: &mut Now, id: i64, at:
     Ok(())
 }
 
+/// An episode that's gone (one of yours, deleted): if it's the one loaded, the room goes quiet.
+pub fn forget(app: &AppHandle, id: i64) {
+    let core = app.state::<Core>();
+    let db = core.db.lock().unwrap();
+    let mut now = core.now.lock().unwrap();
+    if now.episode.as_ref().is_none_or(|e| e.id != id) {
+        return;
+    }
+    send(app, Cmd::Pause);
+    now.episode = None;
+    now.playing = false;
+    now.position = 0.0;
+    now.duration = 0.0;
+    now.place();
+    let _ = store::set_setting(&db, "current", "");
+    broadcast(app, &now);
+}
+
 /// Previous (-1) or next (1) in the list the episode was chosen from.
 #[tauri::command]
 pub fn step(app: AppHandle, core: State<Core>, by: isize) -> R<()> {
@@ -391,7 +409,7 @@ mod tests {
     fn queue_edges() {
         let ep = |id| crate::store::EpisodeRow {
             id, show_id: 1, show_title: String::new(), title: String::new(), published: None, duration: None,
-            position: 0.0, played: false, kept: false, offline: false, image_url: None,
+            position: 0.0, played: false, kept: false, offline: false, image_url: None, show_kind: None,
         };
         let mut n = super::Now { queue: vec![5, 6, 7], episode: Some(ep(5)), ..Default::default() };
         n.place();
@@ -412,6 +430,10 @@ pub fn keep(app: AppHandle, core: State<Core>, id: i64, on: bool) -> R<()> {
     let current = core.now.lock().unwrap().episode.as_ref().map(|e| e.id);
     {
         let db = core.db.lock().unwrap();
+        // An episode you made has no copy anywhere else: it stays.
+        if store::episode(&db, id).map_err(err)?.is_some_and(|e| e.show_kind.is_some()) {
+            return Ok(());
+        }
         store::set_kept(&db, id, on).map_err(err)?;
         if !on && current != Some(id) {
             if let Some(p) = store::audio_source(&db, id).map_err(err)?.0 {

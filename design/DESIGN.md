@@ -88,7 +88,7 @@ Body letter-spacing is 0.01em. Sentence case everywhere. Headings use `text-wrap
 The main window is two panes, **Listen** and **Library**, with no sidebar and no toolbar. The title bar is an overlay, so the whole window is the plane.
 
 - **Listen** (left, at least 620px): cover and title at the top, the shape in the middle, the transport at the bottom. Padding is 64 / 48 / 44. When it narrows below 576px, the transport moves onto its own line and the readouts sit beneath it.
-- **Library** (right, 300–560px, default 400): tabs (New, Following) and the three mode icons (Mini, Pill, Settings) in a 36px header, then one scrolling list with no visible scrollbar. The panes are divided by one hairline. Drag the edge to resize; double-click it to reset.
+- **Library** (right, 300–560px, default 400): a two-row header. The icons (Read to me, Mini, Pill, Settings) sit at the top right in a 28px row; the tabs (New, Following, Notes) sit on their own 34px row beneath. Then one scrolling list with no visible scrollbar. Settings and Read to me are panes, not tabs: while one is open no tab is chosen, and its icon closes it again. The panes are divided by one hairline. Drag the edge to resize; double-click it to reset.
 
 Rows sit 9px apart vertically, with a 14px gap between cover and text. Sections in Settings are separated by a hairline with 22px on each side. The app has no cards.
 
@@ -110,13 +110,17 @@ Rows sit 9px apart vertically, with a 14px gap between cover and text. Sections 
 
 **Note** (the listener's, from M or the note button). On the shape: the 30 seconds as a 2.2px accent span along the line (an arc on the Orbit's chapter ring), ending in a 6.5px open ring with a 2.6px accent dot. Beside it, the **plate**, as the demo film drew it: no box, a 1px accent leader out of the ring, then `NOTE · 4:42–5:12` in mono, the transcript quote when there is one, and the note on a field whose underline takes the accent. Placement rules live in `src/lib/plate.ts` and are checked by `src/lib/plate.check.ts`: centred above the line in Field and Thread, beside (or, in narrow windows, over the outer rays of) the Orbit; the shape never moves, only the bars behind the words fade. In the Mini, the note takes the title and show lines' place while you write, centred, and gives them back after saving. The episode pane lists notes under **Notes**; the show's own notes are **Show notes**. The code calls a note a mark.
 
+**Read to me.** The pane holds one field ("Paste a link, a feed or text"), then Choose file and Choose folder as words, the readings in progress, and Your shows. What's about to be read becomes a **check card**: no box, a hairline above and below, a mono label (`READY TO READ`, `A FEED OF ARTICLES`, `A FOLDER`, `A PODCAST`), the editable title in 19px light type, where it came from, its length, the show it goes into and the voice, then the action in accent beside Cancel. A reading in progress is a row with "Reading 3 of 12" and a 1px accent line under the text. While something is dragged over the window, the library gets a 2px accent edge and a 5% accent wash, its list fades to 8%, and "Drop to hear it" sits in the middle. The Read to me icon carries a 5px accent dot while something is being read or an episode of yours is new.
+
+**Your show's art.** Drawn, never fetched. Read to me is the Orbit at small size: a ring of rays, its first third and rays in the accent, and the head. Every other show of yours is its name in 300-weight type on `--surface` over a short line of sound bars, the first third accent; the same name always draws the same bars. An episode you made is a page: its title and a few grey lines. All of them follow the accent and Day or Night.
+
 **Quiet note.** A result sentence under what caused it ("3 new shows, 2 you already had."). It arrives from 4–8px below with `@starting-style`, once.
 
 **Focus.** A 1.5px accent outline, 3px offset, 4px radius, on keyboard focus only.
 
 ### Icons
 
-Line glyphs in `currentColor`, no fills, 1.1px stroke (1.2px for play and pause), round joins, on 14/16/20px grids. They are all in `src/lib/icons.ts`. Draw new ones to match: open, light and geometric, with no filled shapes.
+Line glyphs in `currentColor`, no fills (Read to me is a page whose last lines have become sound bars), 1.1px stroke (1.2px for play and pause), round joins, on 14/16/20px grids. They are all in `src/lib/icons.ts`. Draw new ones to match: open, light and geometric, with no filled shapes.
 
 ## Surfaces
 
