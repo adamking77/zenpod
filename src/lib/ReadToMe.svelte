@@ -318,7 +318,7 @@
   .rm:hover { color: var(--failed); }
   .row.failed .m { white-space: normal; line-height: 1.45; font-size: 12.5px; color: var(--text-dim); }
   .act { font-size: inherit; color: var(--accent); margin-left: 2px; }
-  .more { display: block; margin: 8px 0 0; }
+  .ways.more { margin: 8px 0 0; }
   .newshow { margin: 8px 0 0; }
   .quiet { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; max-width: 34ch; margin: 8px 0 0; }
   .tip { font-size: 12.5px; color: var(--text-faint); margin-top: 14px; }
