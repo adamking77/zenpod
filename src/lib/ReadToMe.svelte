@@ -134,7 +134,7 @@
       <p class="lede">Make it a show, and its new {word} become episodes. These are its latest:</p>
       <ul class="posts">{#each c.items as t}<li>{t}</li>{/each}</ul>
       <!-- one phrase that's on or off: faint when off, full ink when on -->
-      <span class="words"><button aria-pressed={c.auto} onclick={() => (c.auto = !c.auto)}>Read new {word} automatically</button></span>
+      <span class="words"><button aria-pressed={c.auto} onclick={() => (c.auto = !c.auto)}>Read automatically</button></span>
       <span class="by">Voice: {voiceLabel()} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
       <span class="go"><button class="read" onclick={makeShow}>Make it a show</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
     </div>
