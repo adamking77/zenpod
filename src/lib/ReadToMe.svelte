@@ -144,7 +144,7 @@
   {:else}
     <div class="take">
       <textarea bind:this={field} bind:value={entry} rows="1" placeholder="Paste a link or text" aria-label="A link or text to read" spellcheck="false" onkeydown={keyed} oninput={(e) => grow(e.currentTarget)}></textarea>
-      <span class="ways"><button class="choose" onclick={chooseFile}>Choose a file</button><span class="or">or drop one on the window</span></span>
+      <span class="ways"><button class="choose" onclick={chooseFile}>Open file</button><button class="choose" onclick={chooseFolder}>Open folder</button><span class="or">or drop one on the window</span></span>
     </div>
 
     <!-- The one you just asked for: making it, then playing it, in the same place. -->
@@ -222,7 +222,7 @@
     <input class="name sm newshow" bind:value={showName} placeholder="Name the show" aria-label="New show name" spellcheck="false" autofocus
       onkeydown={(e) => { if (e.key === 'Enter') newShow(); if (e.key === 'Escape') { naming = false; showName = ''; } }} onblur={newShow} />
   {:else}
-    <span class="ways more"><button class="choose" onclick={() => (naming = true)}>New show</button><button class="choose" onclick={chooseFolder}>Follow a folder</button></span>
+    <span class="ways more"><button class="choose" onclick={() => (naming = true)}>New show</button></span>
   {/if}
   {#if !rtm.shows.some((s) => s.kind === 'feed' || s.kind === 'folder')}
     <p class="quiet tip">Follow a blog or a folder and its new posts are read to you.</p>
