@@ -64,8 +64,7 @@
     {/if}
     <div class="opts">
       {#if show.kind === 'feed' || show.kind === 'folder'}
-        <span class="l">New {show.kind === 'feed' ? 'posts' : 'files'}</span>
-        <span class="words"><button aria-pressed={show.auto} onclick={() => reads.setShow(id, { auto: !show.auto })}>Read automatically</button></span>
+        <span class="words wide"><button aria-pressed={show.auto} onclick={() => reads.setShow(id, { auto: !show.auto })}>Read new {show.kind === 'feed' ? 'posts' : 'files'} automatically</button></span>
       {/if}
       <span class="l">Voice</span>
       <span><select aria-label="Voice for this show" value={show.voice ?? ''} onchange={(e) => reads.setShow(id, { voice: e.currentTarget.value })}>
@@ -119,6 +118,7 @@
   .opts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; align-items: baseline; margin: 4px 0 18px; font-size: 13.5px; }
   .l { color: var(--text-faint); font-size: 12.5px; }
   .words { display: flex; gap: 14px; flex-wrap: wrap; }
+  .words.wide { grid-column: 1 / -1; }
   .words button { font-size: 13.5px; color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }
   .words button:hover { color: var(--text-dim); }
   .words button[aria-pressed="true"] { color: var(--text); }
