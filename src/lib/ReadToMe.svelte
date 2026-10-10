@@ -51,10 +51,10 @@
   const count = (n: number) => `${n} ${n === 1 ? 'episode' : 'episodes'}`;
   // What each show is, in plain words.
   function about(s: Show) {
-    if (s.kind === 'read-to-me') return s.episodes ? `Everything you've added · ${count(s.episodes)}` : 'Everything you add lands here';
+    if (s.kind === 'read-to-me') return s.episodes ? `Articles and files you've added · ${count(s.episodes)}` : 'Articles and files you add are kept here';
     if (s.kind === 'feed') return `New posts from ${(s.source ?? '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0]} · ${count(s.episodes)}`;
     if (s.kind === 'folder') return `New files in ${home(s.source ?? '')} · ${count(s.episodes)}`;
-    return s.episodes ? `A show you made · ${count(s.episodes)}` : 'A show you made · move episodes here from Read to me';
+    return `A show you made · ${s.episodes ? count(s.episodes) : 'empty'}`;
   }
   const busy = (s: Show) => rtm.reads.some((r) => r.show_id === s.id && (r.state === 'reading' || r.state === 'queued'));
   const waiting = (s: Show) => rtm.reads.filter((r) => r.show_id === s.id && r.state === 'waiting').length;
@@ -144,7 +144,7 @@
   {:else}
     <div class="take">
       <textarea bind:this={field} bind:value={entry} rows="1" placeholder="Paste a link or text" aria-label="A link or text to read" spellcheck="false" onkeydown={keyed} oninput={(e) => grow(e.currentTarget)}></textarea>
-      <span class="ways"><button class="choose" onclick={chooseFile}>Choose file</button><button class="choose" onclick={chooseFolder}>Choose folder</button><span class="or">or drop one on the window</span></span>
+      <span class="ways"><button class="choose" onclick={chooseFile}>Choose a file</button><span class="or">or drop one on the window</span></span>
     </div>
 
     <!-- The one you just asked for: making it, then playing it, in the same place. -->
@@ -222,10 +222,10 @@
     <input class="name sm newshow" bind:value={showName} placeholder="Name the show" aria-label="New show name" spellcheck="false" autofocus
       onkeydown={(e) => { if (e.key === 'Enter') newShow(); if (e.key === 'Escape') { naming = false; showName = ''; } }} onblur={newShow} />
   {:else}
-    <button class="choose more" onclick={() => (naming = true)}>New show</button>
+    <span class="ways more"><button class="choose" onclick={() => (naming = true)}>New show</button><button class="choose" onclick={chooseFolder}>Show from a folder</button></span>
   {/if}
   {#if !rtm.shows.some((s) => s.kind === 'feed' || s.kind === 'folder')}
-    <p class="quiet tip">Paste a blog's address, or choose a folder, to make a show that gets new episodes by itself.</p>
+    <p class="quiet tip">A show from a folder, or from a blog's address pasted above, gets new episodes by itself.</p>
   {/if}
 </div>
 
