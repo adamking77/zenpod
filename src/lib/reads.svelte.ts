@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { api, type Show } from '$lib/api';
+import { api, type Episode, type Show } from '$lib/api';
 import { feedLink, fromHtml, fromText, host, isLink } from '$lib/extract';
 import { prefs } from '$lib/prefs.svelte';
 import { ui } from '$lib/ui.svelte';
@@ -25,6 +25,8 @@ export const rtm = $state({
   reads: [] as Read[],
   /** Your shows, Read to me first. */
   shows: [] as Show[],
+  /** Episodes of yours not yet heard, newest first: what a finished reading turns into, ready to play. */
+  ready: [] as Episode[],
   card: null as Card | null,
   services: [] as ServiceInfo[],
   mac: [] as MacVoice[],
@@ -35,7 +37,9 @@ export const rtm = $state({
 export const mins = (chars: number) => Math.max(1, Math.round(chars / 900));
 
 export async function loadReads() {
-  let [reads, shows] = await Promise.all([invoke<Read[]>('reads'), api.shows()]);
+  let [reads, shows, newest] = await Promise.all([invoke<Read[]>('reads'), api.shows(), api.newest()]);
+  const week = Date.now() / 1000 - 7 * 86400;
+  rtm.ready = newest.filter((e) => e.show_kind && !e.played && (e.published ?? 0) > week).slice(0, 5);
   // Read to me is always there to send things into.
   if (!shows.some((s) => s.kind === 'read-to-me')) { await invoke('read_to_me'); shows = await api.shows(); }
   rtm.reads = reads;
@@ -47,12 +51,12 @@ export async function loadVoices() {
 }
 
 export function followReads() {
-  const a = listen('reads', () => loadReads().then(fetchWhole)), b = listen('library', loadReads);
+  const a = listen('reads', () => loadReads().then(fetchWhole)), b = listen('library', loadReads), d = listen('episode', loadReads);
   loadReads().then(fetchWhole);
   // Files opened with Zenpod and zenpod://read links, including any that arrived before this window loaded.
   const c = listen('incoming', takeIncoming);
   takeIncoming();
-  return Promise.all([a, b, c]).then((fs) => () => fs.forEach((f) => f()));
+  return Promise.all([a, b, c, d]).then((fs) => () => fs.forEach((f) => f()));
 }
 
 /** Who reads: a show's own voice, or the default from Settings. */

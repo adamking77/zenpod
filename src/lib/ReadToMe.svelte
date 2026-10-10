@@ -5,7 +5,8 @@
   import { home } from '$lib/home';
   import { ui } from '$lib/ui.svelte';
   import { makeShow, mins, readCard, reads, rtm, take, takeFile, takeSource, voiceLabel, type Read } from '$lib/reads.svelte';
-  import { api, type Show } from '$lib/api';
+  import { api, length, type Show } from '$lib/api';
+  import { now, player } from '$lib/now.svelte';
 
   let field = $state<HTMLTextAreaElement>(), entry = $state('');
   // The field takes the cursor whenever the pane is asked for (R, the icon, a card put away).
@@ -40,7 +41,11 @@
     try { const [id] = await api.addShow(url); rtm.card = null; ui.reveal = id; ui.tab = 'following'; }
     catch (e) { rtm.card = { kind: 'error', message: String(e) }; }
   }
-  const progress = (r: Read) => r.state === 'reading' ? `Reading ${Math.min(r.done + 1, r.pieces || 1)} of ${r.pieces || '…'}` : r.state === 'queued' ? 'Next to read' : '';
+  const progress = (r: Read) => r.state === 'queued' ? 'Next to read' : r.done && r.pieces ? `Reading · ${Math.round((r.done / r.pieces) * 100)}%` : 'Starting to read';
+  // After the field, Enter again reads: the card's Read takes the focus.
+  let readButton = $state<HTMLButtonElement>();
+  $effect(() => { if (rtm.card?.kind === 'item') tick().then(() => readButton?.focus({ preventScroll: true })); });
+  const play = (id: number) => player.choose(id, rtm.ready.map((e) => e.id));
 </script>
 
 <div class="pane">
@@ -106,7 +111,7 @@
         <input class="name sm" bind:value={c.newName} placeholder="Name the new show" aria-label="New show name" spellcheck="false" autofocus onkeydown={(e) => e.key === 'Enter' && readCard()} />
       {/if}
       <span class="by">Read by {voiceLabel(cardShow)} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
-      <span class="go"><button class="read" onclick={readCard}>Read</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
+      <span class="go"><button class="read" bind:this={readButton} onclick={readCard}>Read</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
     </div>
   {/if}
 
@@ -124,6 +129,18 @@
         </span>
         {#if r.state === 'reading'}<span class="bar"><i style:width="{(r.done / Math.max(1, r.pieces)) * 100}%"></i></span>{/if}
       </div>
+    {/each}
+  {/if}
+
+  <!-- A finished reading lands here, a click from playing; it leaves once heard. -->
+  {#if rtm.ready.length}
+    <div class="day">Ready to listen</div>
+    {#each rtm.ready as e (e.id)}
+      <button class="row ready" class:playing={now.episode?.id === e.id} onclick={() => play(e.id)}>
+        <Art id={e.show_id} kind={e.show_kind} page={e.title} size={34} />
+        <span class="txt"><span class="t">{e.title}</span>
+          <span class="m sub">{e.show_title} · <span class="num">{length(e)}</span> <span class="go-play">{now.episode?.id === e.id ? (now.playing ? 'Playing' : 'Paused') : 'Play'}</span></span></span>
+      </button>
     {/each}
   {/if}
 
@@ -195,6 +212,8 @@
   button.row:hover .t { color: var(--accent); }
   .row.making .t { color: var(--text-mid); }
   .src { color: var(--text-faint); }
+  .go-play { color: var(--accent); margin-left: 4px; }
+  .row.playing .t { color: var(--accent); }
   .new { color: var(--accent); }
   .bar { position: absolute; left: 48px; right: 0; bottom: 2px; height: 1px; background: var(--hair); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--accent); transition: width 0.5s var(--ease); }
