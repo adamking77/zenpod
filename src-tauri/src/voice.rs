@@ -120,6 +120,9 @@ pub struct MacVoice {
 pub fn mac_voices() -> Vec<MacVoice> {
     let Ok(out) = std::process::Command::new("say").args(["-v", "?"]).output() else { return vec![] };
     let mut v: Vec<MacVoice> = String::from_utf8_lossy(&out.stdout).lines().filter_map(parse_voice_line).collect();
+    // A voice installed in two qualities is listed twice under one name; `say -v` takes the name, so list it once.
+    let mut seen = std::collections::HashSet::new();
+    v.retain(|m| seen.insert(m.name.clone()));
     v.sort_by_key(|m| !m.locale.starts_with("en"));
     v
 }
@@ -327,6 +330,17 @@ mod tests {
         let v = parse_voice_line("Samantha            en_US    # Hello! My name is Samantha.").unwrap();
         assert_eq!(v.name, "Samantha");
         assert!(parse_voice_line("").is_none());
+    }
+
+    #[test]
+    fn mac_voices_are_listed_once() {
+        // Real `say -v '?'`: this Mac lists some voices twice (two qualities, one name); menus key on the name.
+        let v = mac_voices();
+        let mut names: Vec<&str> = v.iter().map(|m| m.name.as_str()).collect();
+        let n = names.len();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), n, "a voice name is listed twice");
     }
 
     #[test]

@@ -5,7 +5,16 @@
   import { home } from '$lib/home';
   import { api, length, type Episode } from '$lib/api';
   import { ui } from '$lib/ui.svelte';
-  import { mins, reads, rtm, voiceLabel } from '$lib/reads.svelte';
+  import { mins, reads, rtm, take, voiceLabel } from '$lib/reads.svelte';
+
+  // A show that takes things one at a time has its own field: what's pasted here goes straight into it.
+  let entry = $state('');
+  function add(e: KeyboardEvent) {
+    if (e.key !== 'Enter' || e.shiftKey || !show) return;
+    e.preventDefault();
+    const v = entry; entry = '';
+    take(v, show.title);
+  }
 
   // A show you made: where its episodes come from, its voice, and its episodes, newest first.
   let { id, current = null, onplay }: { id: number; current?: number | null; onplay: (e: Episode, list: Episode[]) => void } = $props();
@@ -50,6 +59,9 @@
     <h2 class="show-h">{show.title}</h2>
     <p class="show-p">{source}</p>
     {#if show.problem}<p class="show-p problem">{show.problem}</p>{/if}
+    {#if show.kind === 'items' || show.kind === 'read-to-me'}
+      <textarea class="add" rows="1" bind:value={entry} placeholder="Add to {show.title}: paste a link or text" aria-label="Add to {show.title}" spellcheck="false" onkeydown={add}></textarea>
+    {/if}
     <div class="opts">
       {#if show.kind === 'feed' || show.kind === 'folder'}
         <span class="l">New {show.kind === 'feed' ? 'posts' : 'files'}</span>
@@ -84,7 +96,9 @@
           <span class="m sub">{#if e.played === false && e.position === 0 && (e.published ?? 0) > Date.now() / 1000 - 7 * 86400}<span class="new">New</span> · {/if}<span class="num">{length(e)}</span>{#if movable && lists.length}<select class="move" aria-label="Move {e.title} to another show" value="" onchange={(ev) => { const to = Number(ev.currentTarget.value); if (to) reads.move(e.id, to); }}><option value="" disabled>Move to…</option>{#each lists as s (s.id)}<option value={s.id}>{s.title}</option>{/each}</select>{/if}<button class="rm" onclick={() => reads.deleteEpisode(e.id)}>· Delete</button></span></span>
       </div>
     {/each}
-    {#if !pending.length && !episodes.length}<p class="quiet">Nothing here yet.</p>{/if}
+    {#if !pending.length && !episodes.length}
+      <p class="quiet">{show.kind === 'feed' || show.kind === 'folder' ? 'Nothing here yet. New ones arrive when Zenpod next checks.' : show.kind === 'read-to-me' ? 'Nothing here yet. Add something above.' : 'Nothing here yet. Add something above, or move an episode here from Read to me.'}</p>
+    {/if}
 
     {#if show.kind !== 'read-to-me'}
       <button class="leave" onclick={remove}>{armed ? 'Press again to remove this show and its episodes' : 'Remove this show'}</button>
@@ -100,6 +114,11 @@
   .show-h { font-weight: 250; font-size: 24px; line-height: 1.2; margin: 0 0 8px; }
   .show-p.problem { color: var(--failed); margin-top: -8px; }
   .show-p { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin: 0 0 14px; max-width: 38ch; overflow-wrap: anywhere; }
+  .add { all: unset; box-sizing: border-box; display: block; width: 100%; margin: 0 0 18px; font: 400 13.5px/1.45 var(--font-ui); color: var(--text);
+    border-bottom: 1px solid var(--line); padding: 4px 0 6px; resize: none; white-space: pre-wrap; overflow-wrap: anywhere; caret-color: var(--accent);
+    transition: border-color var(--dur-base) var(--ease-hover); }
+  .add:focus { border-bottom-color: var(--accent); }
+  .add::placeholder { color: var(--text-faint); }
   .opts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; align-items: baseline; margin: 4px 0 18px; font-size: 13.5px; }
   .l { color: var(--text-faint); font-size: 12.5px; }
   .words { display: flex; gap: 14px; flex-wrap: wrap; }
