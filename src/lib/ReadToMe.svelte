@@ -133,11 +133,8 @@
       <span class="from">{c.kind === 'folder' ? home(c.source) : c.source.replace(/^https?:\/\//, '')}</span>
       <p class="lede">Make it a show, and its new {word} become episodes. These are its latest:</p>
       <ul class="posts">{#each c.items as t}<li>{t}</li>{/each}</ul>
-      <span class="to">New {word}</span>
-      <span class="words">
-        <button aria-pressed={!c.auto} onclick={() => (c.auto = false)}>Wait for me</button>
-        <button aria-pressed={c.auto} onclick={() => (c.auto = true)}>Read them automatically</button>
-      </span>
+      <!-- one phrase that's on or off: faint when off, full ink when on -->
+      <span class="words"><button aria-pressed={c.auto} onclick={() => (c.auto = !c.auto)}>Read new {word} automatically</button></span>
       <span class="by">Read by {voiceLabel()} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
       <span class="go"><button class="read" onclick={makeShow}>Make it a show</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
     </div>
@@ -251,7 +248,7 @@
   .choose:hover { color: var(--text); }
   .busy { margin: 6px 0 22px; }
 
-  .check { margin: 0 0 24px; padding: 14px 0 16px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); display: grid; gap: 8px; }
+  .check { margin: 0 0 24px; padding: 16px 0 18px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); display: grid; gap: 10px; }
   .k { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; color: var(--text-faint); text-transform: uppercase; }
   .now .k { color: var(--accent); }
   /* the episode to be: its page beside its title, which wraps rather than running off the edge */
@@ -280,7 +277,7 @@
       linear-gradient(-45deg, transparent 50%, var(--text-faint) 50%) right 0 top 55% / 5px 5px no-repeat; }
   .ch { font-size: 13.5px; color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }
   .ch:hover { color: var(--text); }
-  .go { display: flex; gap: 22px; margin-top: 6px; font-size: 14px; }
+  .go { display: flex; gap: 22px; margin-top: 10px; font-size: 14px; }
   .go button { font-size: 14px; }
   .read { color: var(--accent); }
   .cancel { color: var(--text-faint); transition: color var(--dur-base) var(--ease-hover); }
