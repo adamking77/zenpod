@@ -51,7 +51,7 @@
   const count = (n: number) => `${n} ${n === 1 ? 'episode' : 'episodes'}`;
   // What each show is, in plain words.
   function about(s: Show) {
-    if (s.kind === 'read-to-me') return s.episodes ? `Articles and files you've added · ${count(s.episodes)}` : 'Articles and files you add are kept here';
+    if (s.kind === 'read-to-me') return s.episodes ? `Everything you've added · ${count(s.episodes)}. Open to play, move or delete.` : 'Everything you add is saved here';
     if (s.kind === 'feed') return `New posts from ${(s.source ?? '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0]} · ${count(s.episodes)}`;
     if (s.kind === 'folder') return `New files in ${home(s.source ?? '')} · ${count(s.episodes)}`;
     return `A show you made · ${s.episodes ? count(s.episodes) : 'empty'}`;
@@ -289,6 +289,8 @@
   .day { font-size: 12px; color: var(--text-faint); margin: 22px 0 2px; }
   .row { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; align-items: center; width: 100%; text-align: left; padding: 9px 0; }
   .row.show { grid-template-columns: 40px minmax(0, 1fr); padding: 10px 0; }
+  /* a show's line says what it is; it wraps rather than losing the end */
+  .row.show .m { white-space: normal; line-height: 1.4; }
   .txt { min-width: 0; }
   .t { display: block; font-size: 14.5px; line-height: 1.35; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur-base) var(--ease-hover); }
   .m { display: block; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
