@@ -65,10 +65,7 @@
     <div class="opts">
       {#if show.kind === 'feed' || show.kind === 'folder'}
         <span class="l">New {show.kind === 'feed' ? 'posts' : 'files'}</span>
-        <span class="words">
-          <button aria-pressed={!show.auto} onclick={() => reads.setShow(id, { auto: false })}>Wait for me</button>
-          <button aria-pressed={show.auto} onclick={() => reads.setShow(id, { auto: true })}>Read them automatically</button>
-        </span>
+        <span class="words"><button aria-pressed={show.auto} onclick={() => reads.setShow(id, { auto: !show.auto })}>Read automatically</button></span>
       {/if}
       <span class="l">Voice</span>
       <span><select aria-label="Voice for this show" value={show.voice ?? ''} onchange={(e) => reads.setShow(id, { voice: e.currentTarget.value })}>
