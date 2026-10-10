@@ -222,10 +222,10 @@
     <input class="name sm newshow" bind:value={showName} placeholder="Name the show" aria-label="New show name" spellcheck="false" autofocus
       onkeydown={(e) => { if (e.key === 'Enter') newShow(); if (e.key === 'Escape') { naming = false; showName = ''; } }} onblur={newShow} />
   {:else}
-    <span class="ways more"><button class="choose" onclick={() => (naming = true)}>New show</button><button class="choose" onclick={chooseFolder}>Show from a folder</button></span>
+    <span class="ways more"><button class="choose" onclick={() => (naming = true)}>New show</button><button class="choose" onclick={chooseFolder}>Follow a folder</button></span>
   {/if}
   {#if !rtm.shows.some((s) => s.kind === 'feed' || s.kind === 'folder')}
-    <p class="quiet tip">A show from a folder, or from a blog's address pasted above, gets new episodes by itself.</p>
+    <p class="quiet tip">Follow a blog or a folder and its new posts are read to you.</p>
   {/if}
 </div>
 
