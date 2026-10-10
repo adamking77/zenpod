@@ -123,9 +123,9 @@
   .new { color: var(--accent); }
   .err { color: var(--text-dim); white-space: normal; }
   .act { font-size: inherit; color: var(--accent); margin-left: 4px; }
-  .rm { font-size: inherit; color: var(--text-faint); margin-left: 6px; opacity: 0; transition: opacity var(--dur-base) var(--ease-hover), color var(--dur-base) var(--ease-hover); }
-  .row:hover .rm, .rm:focus-visible, .row:hover .move, .move:focus { opacity: 1; }
-  .move { all: unset; pointer-events: auto; cursor: pointer; font-size: inherit; color: var(--text-faint); margin-left: 8px; opacity: 0; transition: opacity var(--dur-base) var(--ease-hover), color var(--dur-base) var(--ease-hover); }
+  /* Move to and Delete are always there, quietly: nobody should have to hover to find them */
+  .rm { font-size: inherit; color: var(--text-faint); margin-left: 6px; transition: color var(--dur-base) var(--ease-hover); }
+  .move { all: unset; pointer-events: auto; cursor: pointer; font-size: inherit; color: var(--text-faint); margin-left: 8px; transition: color var(--dur-base) var(--ease-hover); }
   .move:hover { color: var(--text); }
   .rm:hover { color: var(--failed); }
   .rm.stop:hover { color: var(--text); }

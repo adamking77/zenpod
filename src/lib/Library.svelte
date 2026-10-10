@@ -6,7 +6,7 @@
   import ReadToMe from '$lib/ReadToMe.svelte';
   import YourShow from '$lib/YourShow.svelte';
   import Art from '$lib/Art.svelte';
-  import { openRead, rtm } from '$lib/reads.svelte';
+  import { openRead, reads, rtm } from '$lib/reads.svelte';
   import NotesList from '$lib/NotesList.svelte';
   import NotesTab from '$lib/NotesTab.svelte';
   import { marks } from '$lib/marks.svelte';
@@ -118,7 +118,7 @@
     return () => { un.then((f) => f()); up.then((f) => f()); sn.then((f) => f()); };
   });
 
-  let feedFix = $state(''), fixNote = $state(''), confirming = $state(false);
+  let feedFix = $state(''), fixNote = $state(''), confirming = $state(false), deleting = $state<number | null>(null);
 
   async function fix(ev: SubmitEvent) {
     ev.preventDefault();
@@ -232,6 +232,11 @@
       {#if !now.episode.show_kind}
         <button class="keep" aria-pressed={now.episode.kept} onclick={() => { const e = now.episode!; api.keep(e.id, !e.kept); e.kept = !e.kept; }}>
           {now.episode.kept ? 'Kept offline · let it go' : 'Keep offline'}
+        </button>
+      {:else}
+        <!-- An episode you made lives only here, so deleting it asks twice, the way Stop following does. -->
+        <button class="leave del" onclick={() => { if (deleting === now.episode?.id) reads.deleteEpisode(now.episode.id); else deleting = now.episode?.id ?? null; }}>
+          {deleting === now.episode.id ? 'Press again to delete it' : 'Delete this episode'}
         </button>
       {/if}
       {#if chapters.list.length}
