@@ -139,7 +139,7 @@ Remove this show
 1. **R**, or the icon, then the field: paste or type, then Enter.
 2. **Choose file** or **Choose folder** beside it.
 3. **⌘V** anywhere in the main window when no text field has focus. A link or text on the clipboard opens the pane with the check card.
-4. **Drop** a file, a folder or a link anywhere on the main window. While you drag, the library gets a 2 px accent edge, its list fades back, and "Drop to hear it" / "It goes to Read to me" shows in the middle.
+4. **Drop** files or a folder anywhere on the main window (links are pasted: Tauri claims every drag, so a dragged link never reaches the page). Several files at once go straight into Read to me. While you drag, the library gets a 2 px accent edge, its list fades back, and "Drop to hear it" / "It goes to Read to me" shows in the middle.
 5. **Drop on Zenpod's Dock icon**, or Open With › Zenpod, for PDF, Markdown, text, Word, RTF and HTML files (Tauri file associations).
 6. **`zenpod://read?url=…`**, optionally `&show=…`, using the deep-link handler Notes already registered. This lets Shortcuts, Raycast, a browser bookmark or an agent send things in.
 
@@ -413,6 +413,7 @@ Built on `feat/read-to-me` on 10 October 2026, both milestones together. Where t
 - **Audio** is saved as AAC at the encoder's best variable quality (`afconvert -q 127 -s 3`); a fixed 96 kbps isn't accepted for 22 kHz mono.
 - **After Adam's first test** the pane was reworked so nothing needs a click elsewhere. What you add is one block that changes in place: NEW EPISODE (page cover, title that wraps, length, show, voice, **Listen**; Enter makes it without moving focus), MAKING THE EPISODE (progress and a percentage), then it **plays by itself at 100%** (PLAYING NOW, Pause, Done). Only the reading you asked for plays itself; feed and folder episodes never interrupt. Anything else being made is listed under "Also being made"; your latest 6 episodes under "Recently added" (heard ones dimmed), each with **Move to…** and **Delete** on the row, and Delete beside Pause and Done while it plays, so nothing needs opening its show.
 - **Your shows say what they are**: Read to me is "Everything you've added · 3 episodes"; a show you named is "A show you made"; feed and folder shows name their source, each with an episode count. **New show** makes an empty show in place, and on a show's page any episode can be moved between Read to me and the shows you named (**Move to…**) or deleted.
+- **Review fixes before merge:** a saved key is flagged in settings so Settings never opens the Keychain just to show it; Play a sample waits for a key still being saved; several files opened or dropped together are all read; a folder file changed in the last 30 seconds waits for the next check; waiting posts light the icon's dot and show as "3 ready to read"; a slow page can't overwrite a newer one; the finished reading is started once.
 - **Errors in Settings** say "Paste it above" or "Check it above" instead of pointing to Settings.
 
 ### Checked

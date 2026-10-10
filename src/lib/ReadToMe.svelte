@@ -57,6 +57,7 @@
     return s.episodes ? `A show you made · ${count(s.episodes)}` : 'A show you made · move episodes here from Read to me';
   }
   const busy = (s: Show) => rtm.reads.some((r) => r.show_id === s.id && (r.state === 'reading' || r.state === 'queued'));
+  const waiting = (s: Show) => rtm.reads.filter((r) => r.show_id === s.id && r.state === 'waiting').length;
 
   // A podcast pasted here is followed the usual way, then shown in Following.
   async function follow(url: string) {
@@ -213,7 +214,7 @@
     <button class="row show" onclick={() => (ui.yours = { id: s.id, back: 'read' })} title="Open {s.title}">
       <Art id={s.id} kind={s.kind} name={s.title} size={40} />
       <span class="txt"><span class="t">{s.title}</span>
-        <span class="m sub">{#if busy(s)}<span class="new">Making an episode · </span>{:else if s.fresh}<span class="new">{s.fresh} new · </span>{/if}<span class="src">{about(s)}</span></span></span>
+        <span class="m sub">{#if busy(s)}<span class="new">Making an episode · </span>{:else if waiting(s)}<span class="new">{waiting(s)} ready to read · </span>{:else if s.fresh}<span class="new">{s.fresh} new · </span>{/if}<span class="src">{about(s)}</span></span></span>
     </button>
   {/each}
   {#if naming}

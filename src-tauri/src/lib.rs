@@ -368,8 +368,8 @@ struct ServiceInfo {
 }
 
 #[tauri::command]
-fn voice_services() -> Vec<ServiceInfo> {
-    let saved = voice::keys_saved();
+fn voice_services(core: State<Core>) -> Vec<ServiceInfo> {
+    let saved = voice::keys_saved(&core.db.lock().unwrap());
     voice::SERVICES
         .iter()
         .map(|s| ServiceInfo { id: s.id, name: s.name, model: s.model, voice: s.voice, keyed: saved.get(s.id).copied().unwrap_or(false) })
@@ -377,9 +377,10 @@ fn voice_services() -> Vec<ServiceInfo> {
 }
 
 #[tauri::command]
-fn set_voice_key(service: String, key: String) -> R<()> {
+fn set_voice_key(core: State<Core>, service: String, key: String) -> R<()> {
     voice::service(&service).ok_or("That service isn't known.")?;
-    voice::set_key(&service, &key)
+    voice::set_key(&service, &key)?;
+    store::set_setting(&core.db.lock().unwrap(), &format!("voice_{service}_keyed"), if key.trim().is_empty() { "" } else { "1" }).map_err(err)
 }
 
 #[tauri::command]

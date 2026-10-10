@@ -102,9 +102,10 @@ pub fn set_key(id: &str, value: &str) -> Result<(), String> {
     }
 }
 
-/// Which services have a key saved, so Settings can show the field as filled without reading the key back.
-pub fn keys_saved() -> HashMap<&'static str, bool> {
-    SERVICES.iter().map(|s| (s.id, key(s.id).is_some())).collect()
+/// Which services have a key saved, from a flag kept beside the settings: the Keychain is only opened to read a key
+/// when reading something, never to fill in Settings (each opening can ask the person's permission).
+pub fn keys_saved(db: &rusqlite::Connection) -> HashMap<&'static str, bool> {
+    SERVICES.iter().map(|s| (s.id, store::setting(db, &format!("voice_{}_keyed", s.id)).as_deref() == Some("1"))).collect()
 }
 
 // ---------- this Mac ----------
@@ -227,7 +228,7 @@ fn decode_body(id: &str, body: Vec<u8>, name: &str, model: &str, voice: &str) ->
 
 fn from_hex(s: &str) -> Option<Vec<u8>> {
     let s = s.trim();
-    (s.len() % 2 == 0).then_some(())?;
+    s.len().is_multiple_of(2).then_some(())?;
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok()).collect()
 }
 
@@ -269,8 +270,7 @@ fn refused(name: &str, status: u16, body: &[u8], model: &str, voice: &str) -> St
     let says = |w: &str| text.contains(w);
     match status {
         401 | 403 => format!("{name} didn't accept the key. Check it in Settings\u{a0}›\u{a0}Voice."),
-        429 => format!("{name} says you've hit your limit. Try again later or check your account."),
-        402 => format!("{name} says you've hit your limit. Try again later or check your account."),
+        402 | 429 => format!("{name} says you've hit your limit. Try again later or check your account."),
         _ if says("voice") && (says("not found") || says("invalid") || says("unknown") || says("does not exist")) => format!("{name} doesn't know the voice “{voice}”."),
         404 => format!("{name} doesn't know the model “{model}”."),
         _ if says("model") && (says("not found") || says("invalid") || says("unknown") || says("does not exist")) => format!("{name} doesn't know the model “{model}”."),

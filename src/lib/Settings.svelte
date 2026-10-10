@@ -13,11 +13,15 @@
   const svc = $derived(rtm.services.find((x) => x.id === (prefs.voice_service || 'openai')) ?? rtm.services[0]);
   const fromService = $derived(prefs.voice_from === 'service');
   let keyNote = $state(''), sample = $state<{ text: string; bad?: boolean } | null>(null), sampling = $state(false);
-  async function saveKey(e: Event) {
+  // Saved as the field is left; Play a sample waits for it, so a key pasted and tried at once is the one used.
+  let saving: Promise<void> | null = null;
+  function saveKey(e: Event) {
     const input = e.currentTarget as HTMLInputElement, v = input.value.trim();
     if (!svc || !v) return;
-    try { await invoke('set_voice_key', { service: svc.id, key: v }); input.value = ''; keyNote = ''; await loadVoices(); }
-    catch (err) { keyNote = String(err); }
+    saving = (async () => {
+      try { await invoke('set_voice_key', { service: svc.id, key: v }); input.value = ''; keyNote = ''; await loadVoices(); }
+      catch (err) { keyNote = String(err); }
+    })();
   }
   async function forgetKey() {
     if (!svc) return;
@@ -28,6 +32,7 @@
   const setField = (k: 'model' | 'voice') => (e: Event) => { if (svc) setPref(`voice_${svc.id}_${k}`, (e.currentTarget as HTMLInputElement).value.trim()); };
   async function playSample() {
     sampling = true; sample = null;
+    await saving;
     try {
       const url = await invoke<string>('voice_sample', { showId: null });
       sample = { text: fromService && svc ? `Playing “${svcField('voice')}” from ${svc.name}` : `Playing ${prefs.voice_mac || 'the Mac’s voice'}` };

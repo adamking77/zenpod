@@ -78,8 +78,8 @@
       {#if ui.empty}
         <p class="sub">Bring your shows in to begin.</p>
         <span class="ways">
-          <button onclick={() => { ui.notes = false; ui.tab = 'settings'; }}>Bring my list</button>
-          <button onclick={() => { ui.notes = false; ui.tab = 'settings'; ui.paste = true; }}>Paste an address</button>
+          <button onclick={() => { ui.notes = false; ui.yours = null; ui.tab = 'settings'; }}>Bring my list</button>
+          <button onclick={() => { ui.notes = false; ui.yours = null; ui.tab = 'settings'; ui.paste = true; }}>Paste an address</button>
         </span>
       {:else}
         <p class="sub">Choose an episode on the right.</p>

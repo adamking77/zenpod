@@ -155,8 +155,9 @@
     ui.arrived = null;
   }
   const tabOn = (t: string) => !ui.notes && !ui.yours && ui.tab === t;
-  // The icon's dot: something is being read, or a new episode of yours hasn't been played.
-  const lit = $derived(rtm.reads.some((r) => r.state === 'reading' || r.state === 'queued') || rtm.shows.some((s) => s.fresh > 0));
+  // The icon's dot: something is being read, a feed or folder show has posts waiting for you, or a new episode of
+  // yours hasn't been played.
+  const lit = $derived(rtm.reads.some((r) => r.state === 'reading' || r.state === 'queued' || r.state === 'waiting') || rtm.shows.some((s) => s.fresh > 0));
   const yours = (s: Show) => s.kind != null;
 
   async function drill(s: Show | null) {

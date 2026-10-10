@@ -73,16 +73,21 @@ export function voiceLabel(show?: Show | null) {
 }
 
 /** The reading you just asked for: when it's an episode, it plays. Nothing else starts by itself. */
+let checking = false;
 async function follow(reads: Read[]) {
   const c = rtm.current;
-  if (!c || c.episode) return;
+  if (!c || c.episode || checking) return;
   const pending = reads.find((r) => r.id === c.read);
   if (pending) { c.error = pending.state === 'failed' ? pending.error : null; return; }
-  const r = await invoke<Read | null>('read_status', { id: c.read });
-  if (r?.state === 'done' && r.episode_id && rtm.current === c) {
-    c.episode = r.episode_id;
-    player.choose(r.episode_id, [r.episode_id]);
-  } else if (!r) rtm.current = null; // removed meanwhile
+  // The reads and library events arrive together when it finishes; only one of them gets to start it.
+  checking = true;
+  try {
+    const r = await invoke<Read | null>('read_status', { id: c.read });
+    if (r?.state === 'done' && r.episode_id && rtm.current === c && !c.episode) {
+      c.episode = r.episode_id;
+      player.choose(r.episode_id, [r.episode_id]);
+    } else if (!r && rtm.current === c) rtm.current = null; // removed meanwhile
+  } finally { checking = false; }
 }
 
 /** Open Read to me with the field ready. */
@@ -97,10 +102,14 @@ async function homeShow() {
   return rtm.shows.find((s) => s.kind === 'read-to-me')?.id ?? (await invoke<number>('read_to_me'));
 }
 
-/** A link or text, from the field, ⌘V, a drop or a zenpod://read link. */
+// Each take gets a number; a slow page that answers after a newer take has nothing left to fill.
+let takes = 0;
+
+/** A link or text, from the field, ⌘V or a zenpod://read link. */
 export async function take(input: string, into?: string | null) {
   const v = input.trim();
   if (!v) return;
+  const mine = ++takes;
   openRead();
   const to = (into && rtm.shows.find((s) => s.title.toLowerCase() === into.toLowerCase())?.id) || (await homeShow());
   if (!isLink(v)) {
@@ -111,7 +120,7 @@ export async function take(input: string, into?: string | null) {
   rtm.card = { kind: 'busy', what: `Opening ${host(v)}…` };
   try {
     const page = await invoke<{ url: string; kind: 'page' | 'podcast' | 'feed'; html: string; title: string | null }>('fetch_page', { url: v });
-    if (rtm.card?.kind !== 'busy') return; // cancelled meanwhile
+    if (rtm.card?.kind !== 'busy' || mine !== takes) return; // cancelled, or something newer was given
     if (page.kind === 'podcast') { rtm.card = { kind: 'podcast', name: page.title ?? host(page.url), url: v }; return; }
     if (page.kind === 'feed') { await takeSource('feed', page.url); return; }
     // A blog's front page, or a page with no article but a feed: the feed becomes a show.
@@ -122,7 +131,7 @@ export async function take(input: string, into?: string | null) {
       ? { kind: 'item', title: d.title, from: `${host(page.url)} · article`, source: page.url, text: d.text, to, newName: '' }
       : { kind: 'error', message: 'There’s no article text on that page.' };
   } catch (e) {
-    if (rtm.card?.kind === 'busy') rtm.card = { kind: 'error', message: String(e) };
+    if (rtm.card?.kind === 'busy' && mine === takes) rtm.card = { kind: 'error', message: String(e) };
   }
 }
 
@@ -173,6 +182,29 @@ async function fetchWhole() {
   }
 }
 
+/** Several files at once (a drop, Open With): one goes to the card; more go straight into Read to me, one after another. */
+export async function takeFiles(paths: string[]) {
+  if (paths.length <= 1) return paths[0] ? takeFile(paths[0]) : undefined;
+  openRead();
+  rtm.card = { kind: 'busy', what: `Opening ${paths.length} files…` };
+  const show = await homeShow();
+  let added = 0;
+  const skipped: string[] = [];
+  for (const path of paths) {
+    const name = path.split('/').pop() ?? path;
+    try {
+      if (await invoke<boolean>('is_folder', { path })) { skipped.push(name); continue; }
+      const d = await invoke<{ title: string; text: string }>('read_file', { path });
+      await invoke('add_read', { showId: show, newShow: null, title: d.title, source: name, text: d.text });
+      added++;
+    } catch { skipped.push(name); }
+  }
+  rtm.card = skipped.length
+    ? { kind: 'error', message: `${added ? `${added} added to Read to me. ` : ''}Couldn't read ${skipped.join(', ')}.` }
+    : null;
+  rtm.focus++;
+}
+
 /** A file from Choose file, a drop, the Dock or Open With. A folder becomes a show of its own. */
 export async function takeFile(path: string) {
   if (await invoke<boolean>('is_folder', { path })) return takeSource('folder', path);
@@ -190,9 +222,10 @@ export async function takeFile(path: string) {
 
 async function takeIncoming() {
   const items = await invoke<{ kind: 'file' | 'link'; value: string; show: string | null }[]>('take_incoming');
-  const last = items.at(-1);
-  if (last?.kind === 'file') takeFile(last.value);
-  else if (last) take(last.value, last.show);
+  const files = items.filter((i) => i.kind === 'file').map((i) => i.value);
+  const link = items.findLast((i) => i.kind === 'link');
+  if (files.length) takeFiles(files);
+  else if (link) take(link.value, link.show);
 }
 
 /** Read it: into the show chosen, or a new one named on the card. */

@@ -178,8 +178,12 @@ fn entities(s: &str) -> String {
 
 const READABLE: &[&str] = &["md", "markdown", "txt", "pdf", "docx", "doc", "rtf", "html", "htm"];
 
-/// Readable files directly in the folder, newest first.
+/// A file changed this recently may still be being written; it's picked up on the next check instead.
+const SETTLE: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Readable files directly in the folder, newest first, leaving out any still being written.
 pub fn folder_files(dir: &Path) -> Result<Vec<(PathBuf, std::time::SystemTime)>, String> {
+    let settled = std::time::SystemTime::now() - SETTLE;
     let rd = std::fs::read_dir(dir).map_err(|_| "That folder isn't there any more.".to_string())?;
     let mut files: Vec<(PathBuf, std::time::SystemTime)> = rd
         .filter_map(|e| e.ok())
@@ -187,6 +191,7 @@ pub fn folder_files(dir: &Path) -> Result<Vec<(PathBuf, std::time::SystemTime)>,
         .filter(|p| p.is_file() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
         .filter(|p| p.extension().and_then(|e| e.to_str()).is_some_and(|e| READABLE.contains(&e.to_lowercase().as_str())))
         .filter_map(|p| Some((p.clone(), p.metadata().ok()?.modified().ok()?)))
+        .filter(|(_, m)| *m <= settled)
         .collect();
     files.sort_by(|a, b| b.1.cmp(&a.1));
     Ok(files)
@@ -214,10 +219,11 @@ pub async fn preview(kind: &str, source: &str) -> Result<Preview, String> {
 // ---------- making and checking ----------
 
 /// A new read from a source. Text the feed carried is stored now; a summary-only post waits for its page.
-fn add(app: &AppHandle, db: &rusqlite::Connection, show: i64, auto: bool, key: &str, title: &str, source: &str, text: &str, link: Option<&str>) -> Result<(), String> {
+fn add(app: &AppHandle, db: &rusqlite::Connection, show: i64, auto: bool, it: &Item, fallback: &str) -> Result<(), String> {
+    let (text, link) = (&it.text, it.link.as_deref());
     let needs = link.is_some() && text.chars().count() < WHOLE;
     let state = if auto { "queued" } else { "waiting" };
-    let Some(id) = store::add_source_read(db, show, title, source, key, text.chars().count() as i64, state, link, needs).map_err(|e| e.to_string())? else { return Ok(()) };
+    let Some(id) = store::add_source_read(db, show, &it.title, link.unwrap_or(fallback), &it.key, text.chars().count() as i64, state, link, needs).map_err(|e| e.to_string())? else { return Ok(()) };
     let d = read::dir(app);
     std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
     std::fs::write(d.join(format!("{id}.txt")), text).map_err(|e| e.to_string())
@@ -235,7 +241,7 @@ pub async fn make(app: &AppHandle, kind: &str, source: &str, name: &str, auto: b
     }
     // Oldest first, so they read and list in the order they were written.
     for it in first.iter().rev().filter(|it| !it.text.is_empty() || it.link.is_some()) {
-        add(app, &db, show, auto, &it.key, &it.title, it.link.as_deref().unwrap_or(source), &it.text, it.link.as_deref())?;
+        add(app, &db, show, auto, it, source)?;
     }
     drop(db);
     after(app);
@@ -296,7 +302,7 @@ pub async fn check(app: &AppHandle) {
         }
         // Oldest first, so they read and list in the order they arrived.
         for it in ready.iter().rev().filter(|it| !it.text.is_empty() || it.link.is_some()) {
-            if let Err(e) = add(app, &db, show, auto, &it.key, &it.title, it.link.as_deref().unwrap_or(&source), &it.text, it.link.as_deref()) {
+            if let Err(e) = add(app, &db, show, auto, it, &source) {
                 eprintln!("[sources] {source}: {e}");
             }
         }
@@ -343,11 +349,16 @@ mod tests {
     fn folders_list_readable_files_newest_first() {
         let dir = std::env::temp_dir().join(format!("zenpod-folder-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("old.md"), "# Old\n\nText").unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(20));
-        std::fs::write(dir.join("new.txt"), "Newer text").unwrap();
-        std::fs::write(dir.join("image.png"), "x").unwrap();
-        std::fs::write(dir.join(".hidden.md"), "x").unwrap();
+        let aged = |name: &str, body: &str, secs: u64| {
+            std::fs::write(dir.join(name), body).unwrap();
+            let t = std::time::SystemTime::now() - std::time::Duration::from_secs(secs);
+            std::fs::File::options().write(true).open(dir.join(name)).unwrap().set_modified(t).unwrap();
+        };
+        aged("old.md", "# Old\n\nText", 600);
+        aged("new.txt", "Newer text", 120);
+        aged("image.png", "x", 600);
+        aged(".hidden.md", "x", 600);
+        std::fs::write(dir.join("writing.md"), "half a brie").unwrap(); // just written: left for the next check
         let f = folder_files(&dir).unwrap();
         assert_eq!(f.iter().map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned()).collect::<Vec<_>>(), ["new.txt", "old.md"]);
         let _ = std::fs::remove_dir_all(&dir);

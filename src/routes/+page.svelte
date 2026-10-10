@@ -6,7 +6,7 @@
   import { dragWindow } from '$lib/drag';
   import { arrivals, follow, keys, now, player } from '$lib/now.svelte';
   import { followMarks } from '$lib/marks.svelte';
-  import { followReads, openRead, take, takeFile } from '$lib/reads.svelte';
+  import { followReads, openRead, take, takeFiles } from '$lib/reads.svelte';
   import { ui } from '$lib/ui.svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
 
@@ -26,12 +26,13 @@
   onMount(() => {
     loadPrefs();
     const un = follow(), arr = arrivals('win'), mk = followMarks(), rd = followReads();
-    // Files dragged in arrive through the window (with their paths); links and text through the page's own drop.
+    // Files and folders dragged in arrive through the window, with their paths. (Tauri claims every drag, so a dragged
+    // link never reaches the page; links are pasted instead.)
     const dd = getCurrentWebview().onDragDropEvent((e) => {
       const p = e.payload;
       if (p.type === 'enter') { if (p.paths.length) ui.dropping = true; }
       else if (p.type === 'leave') ui.dropping = false;
-      else if (p.type === 'drop') { ui.dropping = false; if (p.paths[0]) takeFile(p.paths[0]); }
+      else if (p.type === 'drop') { ui.dropping = false; if (p.paths.length) takeFiles(p.paths); }
     });
     return () => { un.then((f) => f()); arr.then((f) => f()); mk.then((f) => f()); rd.then((f) => f()); dd.then((f) => f()); };
   });
@@ -48,21 +49,10 @@
     const t = e.clipboardData?.getData('text/plain')?.trim();
     if (t) { e.preventDefault(); take(t); }
   }
-  let depth = 0;
-  const linkDrag = (e: DragEvent) => !!e.dataTransfer && !e.dataTransfer.types.includes('Files') && (e.dataTransfer.types.includes('text/uri-list') || e.dataTransfer.types.includes('text/plain'));
-  function dragenter(e: DragEvent) { if (!linkDrag(e)) return; e.preventDefault(); depth++; ui.dropping = true; }
-  function dragover(e: DragEvent) { if (!linkDrag(e)) return; e.preventDefault(); e.dataTransfer!.dropEffect = 'copy'; }
-  function dragleave(e: DragEvent) { if (!linkDrag(e)) return; if (--depth <= 0) { depth = 0; ui.dropping = false; } }
-  function drop(e: DragEvent) {
-    if (!linkDrag(e)) return;
-    e.preventDefault(); depth = 0; ui.dropping = false;
-    const d = e.dataTransfer!, uri = d.getData('text/uri-list').split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#'));
-    take(uri || d.getData('text/plain'));
-  }
 
 </script>
 
-<svelte:window onkeydown={key} onpaste={paste} ondragenter={dragenter} ondragover={dragover} ondragleave={dragleave} ondrop={drop} bind:innerWidth={vw} />
+<svelte:window onkeydown={key} onpaste={paste} bind:innerWidth={vw} />
 
 <main class="win" use:dragWindow>
   <div class="panes" style:--lib="{lib}px">
