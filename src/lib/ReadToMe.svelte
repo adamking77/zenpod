@@ -101,8 +101,8 @@
         <input class="name sm" bind:value={c.newName} placeholder="Name the new show" aria-label="New show name" spellcheck="false" autofocus />
       {/if}
       <span class="by">Read by {voiceLabel(cardShow)} <button class="ch" onclick={() => { ui.tab = 'settings'; }}>· Change</button></span>
-      <span class="go"><button class="read" onclick={readCard}>Make the episode</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
-      <span class="hint">Press Enter to make it. It starts playing as soon as it's ready.</span>
+      <span class="go"><button class="read" onclick={readCard}>Listen</button><button class="cancel" onclick={() => { rtm.card = null; rtm.focus++; }}>Cancel</button></span>
+      <span class="hint">Press Enter to listen. It starts as soon as it's ready.</span>
     </div>
   {:else if rtm.card?.kind === 'busy'}
     <p class="quiet busy" aria-live="polite">{rtm.card.what}</p>
