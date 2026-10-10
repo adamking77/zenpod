@@ -54,6 +54,8 @@ export async function loadVoices() {
 }
 
 export function followReads() {
+  // The card names the voice, so the services and this Mac's voices are needed before Settings is ever opened.
+  loadVoices();
   const a = listen('reads', () => loadReads().then(fetchWhole)), b = listen('library', loadReads), d = listen('episode', loadReads);
   loadReads().then(fetchWhole);
   // Files opened with Zenpod and zenpod://read links, including any that arrived before this window loaded.
