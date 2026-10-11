@@ -28,6 +28,14 @@ The Mini and the Pill float above other windows. They never take focus from the 
   </tr>
 </table>
 
+## Notes and Read to me
+
+Press M to keep what you just heard and write a note beside it. Read to me turns articles, newsletters and documents into episodes, read in a voice you choose.
+
+| A note, written beside the episode | Read to me, with an article ready to read |
+| --- | --- |
+| ![A note written beside the episode](docs/screenshots/notes.png) | ![Read to me with an article ready to read](docs/screenshots/read-to-me.png) |
+
 ## What it does
 
 - Follows shows by feed address or by name, and checks them hourly.
